@@ -51,6 +51,7 @@
 # load required tables here
 #post-con status notes
   postcon_notes <- dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(note_date) as fq from fieldwork.tbl_postcon_notes")
+  
 #post-con status 
   postcon_status <- dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(status_date) as fq from fieldwork.tbl_postcon_status")
 #current status
@@ -138,7 +139,7 @@
     rv$end_date <- reactive(lubridate::mdy(paste0(input$end_quarter, "/", ifelse(input$end_quarter == "9/30" | input$end_quarter == "12/31", as.numeric(input$end_fy)-1,input$end_fy))))
 
     
-    output$table_name <- renderText(ifelse(input$date_range == "To-Date", "Status To Date:", paste("Post-Con Status Starting From ", rv$start_date(), " To ", rv$end_date(),":", sep = "")))
+    output$table_name <- renderText(ifelse(input$date_range == "To-Date", paste("Current Post-Con Status to Date:", input$status), paste("Current Post-Con Status", " Assigned between ", rv$start_date(), " and ", rv$end_date(),": ",input$status, sep = "")))
     
 ### First tab: Post-Construction Status Table
     # todate 
@@ -199,7 +200,16 @@
                 showPageSizeOptions = TRUE,
                 pageSizeOptions = c(25, 50, 100),
                 defaultPageSize = 25,
-                height = 1000
+                height = 1000, 
+                details = function(index) {
+                  notes <- postcon_notes[postcon_notes$system_id == rv$pc_status()$`System ID`[index], ] %>%
+                    arrange(desc(note_date)) %>%
+                    select(`Note Date`= note_date, Notes = notes)
+                  htmltools::div(style = "padding: 1rem",
+                                 reactable(notes, outlined = TRUE)
+                  )
+                }
+                
       ))
     
     
