@@ -202,11 +202,14 @@
                 defaultPageSize = 25,
                 height = 1000, 
                 details = function(index) {
-                  notes <- postcon_notes[postcon_notes$system_id == rv$pc_status()$`System ID`[index], ] %>%
+                  nested_notes <- postcon_notes[postcon_notes$system_id == rv$pc_status()$`System ID`[index], ] %>%
                     arrange(desc(note_date)) %>%
                     select(`Note Date`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
-                                 reactable(notes, outlined = TRUE)
+                                 reactable(nested_notes, columns = list(
+                                   `Note Date` = colDef(width = 100),
+                                    Notes = colDef(width = 1050)
+                                 ), outlined = TRUE)
                   )
                 }
                 
