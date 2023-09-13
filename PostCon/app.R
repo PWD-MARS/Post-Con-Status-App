@@ -20,9 +20,13 @@
   library(shinyjs)
   #DT for datatables
   library(DT)
+  #reactable
+  library(reactable)
   #reactable for reactable tables
   library(reactable)
-  #Not in logical
+  #excel download
+  library(xlsx)
+#Not in logical
   `%!in%` <- Negate(`%in%`)
 
 #0.1: database connection and global options --------
@@ -46,20 +50,35 @@
 
 # load required tables here
 #post-con status notes
-  postcon_status_notes <- dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(date) as fq from fieldwork.tbl_postcon_status")
+  postcon_notes <- dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(note_date) as fq from fieldwork.tbl_postcon_notes")
+#post-con status 
+  postcon_status <- dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(status_date) as fq from fieldwork.tbl_postcon_status")
+#current status
+  postcon_status_current <- postcon_status %>%
+    group_by(system_id) %>%
+    summarise(postcon_status_uid, postcon_status_lookup_uid, status_date = max(status_date), fq)
+  
   
 #post-con status types
   postcon_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup")
   
-#status list
+# join status 
+  postcon_status_dl <- postcon_status %>%
+    inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid")
   
+#status list
   status_choice <- postcon_status_lookup %>%
     select(status) %>%
     distinct() %>%
     pull
 
 #system ids
-  system_id <- odbc::dbGetQuery(poolConn, paste0("select distinct system_id from external.mat_assets where system_id like '%-%'")) %>% 
+  # comprehensive list
+  system_id_all <- odbc::dbGetQuery(poolConn, paste0("select distinct system_id from external.mat_assets where system_id like '%-%'")) %>% 
+    dplyr::arrange(system_id) %>%  
+    dplyr::pull()
+  # those with post-con status
+  system_id_postcon <- odbc::dbGetQuery(poolConn, paste0("select distinct system_id from fieldwork.tbl_postcon_status")) %>% 
     dplyr::arrange(system_id) %>%  
     dplyr::pull()
   
@@ -71,40 +90,38 @@
   start_fy <- 2012
   years <- start_fy:current_fy %>% sort(decreasing = TRUE)
   
-  
-
   # Define UI
-  ui <- fluidPage(
-    
-    # Application title
-    titlePanel("Post construction Status App"),
-    
-    sidebarLayout(
-      
-      # Sidebar with a slider input
-      sidebarPanel(
-        selectInput("date_range", "Date Range", choices = c("To-Date", "Select Range")),
-        conditionalPanel(condition = "input.date_range == 'Select Range'", 
-                         fluidRow(column(6,
-                                         selectInput("start_fy", "Start Fiscal Year (FY)", choices = years)),
-                                  column(6,selectInput("start_quarter", "Start Fiscal Quarter", 
-                                                       choices = c("Q1" = "7/1", "Q2" = "10/1","Q3" = "1/1", "Q4" = "4/1")))),
-                         fluidRow(column(6,
-                                         selectInput("end_fy", "End Fiscal Year (FY)", choices = years)),
-                                  column(6,selectInput("end_quarter", "End Fiscal Quarter", 
-                                                       choices = c("Q1" = "9/30", "Q2" = "12/31","Q3" = "3/31", "Q4" = "6/30"))))
-        ), 
-        selectInput("status", "Post Construction Status", choices = status_choice, selected = NULL),
-        
-        #1.3 DL Button --------
-        downloadButton("download_table", "Download")
-      ),
-      
-      # Show a plot of the generated distribution
-      mainPanel(
-        DTOutput("postcon_table")
-      )
-    )
+  ui <- navbarPage("Post-Construction Status", 
+                   #1.1 Unmonitored Active SMPs -------
+                   tabPanel("Post-Construction Status Table", value = "status", 
+                            titlePanel("Current Post-Construction Status Table"),
+                            sidebarLayout(
+                              
+                              sidebarPanel(
+                                #selectInput("system_id_pc", "System ID", choices = system_id_postcon, selected = NULL),
+                                selectInput("date_range", "Date Range", choices = c("To-Date", "Select Range")),
+                                conditionalPanel(condition = "input.date_range == 'Select Range'", 
+                                                 fluidRow(column(6,
+                                                                 selectInput("start_fy", "Start Fiscal Year (FY)", choices = years)),
+                                                          column(6,selectInput("start_quarter", "Start Fiscal Quarter", 
+                                                                               choices = c("Q1" = "7/1", "Q2" = "10/1","Q3" = "1/1", "Q4" = "4/1")))),
+                                                 fluidRow(column(6,
+                                                                 selectInput("end_fy", "End Fiscal Year (FY)", choices = years)),
+                                                          column(6,selectInput("end_quarter", "End Fiscal Quarter", 
+                                                                               choices = c("Q1" = "9/30", "Q2" = "12/31","Q3" = "3/31", "Q4" = "6/30"))))
+                                ), 
+                                selectInput("status", "Post Construction Status", choices = c("", status_choice) , selected = ""),
+                                #1.3 DL Button --------
+                                downloadButton("download_table", "Download")
+                              ),
+                              
+                              # Show a plot of the generated distribution
+                              mainPanel(
+                                strong(span(textOutput("table_name"), style = "font-size:22px")),
+                                reactableOutput("postcon_table")
+                              )
+                            )
+                            )
   )
   
   # Server logic
@@ -119,22 +136,88 @@
     #convert FY/Quarter to a real date
     rv$start_date <- reactive(lubridate::mdy(paste0(input$start_quarter, "/", ifelse(input$start_quarter == "7/1" | input$start_quarter == "10/1", as.numeric(input$start_fy)-1,input$start_fy))))
     rv$end_date <- reactive(lubridate::mdy(paste0(input$end_quarter, "/", ifelse(input$end_quarter == "9/30" | input$end_quarter == "12/31", as.numeric(input$end_fy)-1,input$end_fy))))
+
     
+    output$table_name <- renderText(ifelse(input$date_range == "To-Date", "Status To Date:", paste("Post-Con Status Starting From ", rv$start_date(), " To ", rv$end_date(),":", sep = "")))
     
-    # Prep the post-con status table for mainpanel
-    rv$postcon_table <- reactive({
-      postcon_table <- postcon_status_notes %>%
+### First tab: Post-Construction Status Table
+    # todate 
+    rv$pc_status_todate <- reactive(
+      if(input$status == ""){
+        
+       postcon_status_current %>%
         inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
-        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = date, Quarter = fq, Notes = notes)
-      
-      return(postcon_table)
-    })
+        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq)
+        
+      } else{
+        
+       postcon_status_current %>%
+          inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
+          filter(status == input$status) %>%
+          select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq)
+        
+      }
+    )
     
-    output$postcon_table <- renderDataTable(rv$postcon_table(),
-                                            selection = 'single', 
-                                            style = 'bootstrap',
-                                            class = 'table-responsive, table-hover', 
-                                            rownames = FALSE)
+    # quarter based 
+    rv$pc_status__q <- reactive( 
+      if(input$status == "") {
+      postcon_status_current %>%
+        inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
+        filter(status_date >= as.Date(rv$start_date()) & status_date <= as.Date(rv$end_date())) %>%
+        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq)
+      
+      } else {
+        
+      postcon_status_current %>%
+          inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
+          filter(status_date >= as.Date(rv$start_date()) & status_date <= as.Date(rv$end_date())) %>%
+          filter(status == input$status) %>%
+          select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq)
+        
+      }
+    )
+    
+    
+    rv$pc_status <- reactive(ifelse(input$date_range == "To-Date", return(rv$pc_status_todate()), return(rv$pc_status__q())))
+
+    # output$postcon_table <- renderDataTable(rv$pc_status(),
+    #                                         selection = 'single', 
+    #                                         style = 'bootstrap',
+    #                                         class = 'table-responsive, table-hover', 
+    #                                         rownames = FALSE)
+    # 
+    # 
+    output$postcon_table <- renderReactable(
+      reactable(rv$pc_status(), 
+                fullWidth = TRUE,
+                selection = "single",
+                searchable = TRUE,
+                onClick = "select",
+                selectionId = "status_selected",
+                #searchable = TRUE,
+                showPageSizeOptions = TRUE,
+                pageSizeOptions = c(25, 50, 100),
+                defaultPageSize = 25,
+                height = 1000
+      ))
+    
+    
+    
+    
+    #download button
+    output$download_table <- downloadHandler(
+      
+      filename = function() {
+        paste("Post-Con Table", "_", Sys.Date(), ".xlsx", sep = "")
+      },
+      content = function(filename){
+        
+        df_list <- list(postcon_status_dl)
+        write.xlsx(x = df_list , file = filename)
+      }
+    ) 
+    
   }
   
   # Complete app with UI and server components
