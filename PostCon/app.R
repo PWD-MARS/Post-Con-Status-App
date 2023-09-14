@@ -182,13 +182,6 @@
     
     rv$pc_status <- reactive(ifelse(input$date_range == "To-Date", return(rv$pc_status_todate()), return(rv$pc_status__q())))
 
-    # output$postcon_table <- renderDataTable(rv$pc_status(),
-    #                                         selection = 'single', 
-    #                                         style = 'bootstrap',
-    #                                         class = 'table-responsive, table-hover', 
-    #                                         rownames = FALSE)
-    # 
-    # 
     output$postcon_table <- renderReactable(
       reactable(rv$pc_status(), 
                 fullWidth = TRUE,
