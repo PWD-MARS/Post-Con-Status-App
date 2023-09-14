@@ -92,7 +92,7 @@
   years <- start_fy:current_fy %>% sort(decreasing = TRUE)
   
   # Define UI
-  ui <- navbarPage("Post-Construction Status", 
+  ui <- navbarPage("Post-Construction Status", id = "TabPanelID",
                    #1.1 Unmonitored Active SMPs -------
                    tabPanel("Post-Construction Status Table", value = "status", 
                             titlePanel("Current Post-Construction Status Table"),
@@ -116,17 +116,32 @@
                                 downloadButton("download_table", "Download")
                               ),
                               
-                              # Show a plot of the generated distribution
                               mainPanel(
                                 strong(span(textOutput("table_name"), style = "font-size:22px")),
                                 reactableOutput("postcon_table")
                               )
                             )
-                            )
+                            ),
+                   tabPanel("Add/Edit Post-Construction Status", value = "add_edit", 
+                   titlePanel("Add/Edit Post-Construction Status and Notes"), 
+                   sidebarLayout(
+                     
+                     sidebarPanel(
+                       selectInput("system_id", "System ID", choices = c("", system_id_all) , selected = ""),
+                       selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = ""),
+                       dateInput("date",label = "Date",value = NULL),
+                       textAreaInput("note", "Post-Construction Note:", height = '85px')
+                       
+              
+                     ),
+                     mainPanel(
+                      
+                     )
+                   ))
   )
   
   # Server logic
-  server <- function(input, output) {
+  server <- function(input, output, session) {
 
     #initialzie reactive values
     rv <- reactiveValues()
@@ -222,8 +237,32 @@
         df_list <- list(postcon_status_dl)
         write.xlsx(x = df_list , file = filename)
       }
-    ) 
+    )
     
+    # Create a reactiveVal to store the selected system_id
+    selected_system_id <- reactiveVal(NULL)
+    selected_status <- reactiveVal(NULL)
+    
+    observeEvent(input$status_selected, {
+      if (!is.null(input$status_selected)) {
+        # Get the selected System ID from the clicked row
+        selected_system_id(rv$pc_status()$`System ID`[input$status_selected])
+        selected_status(rv$pc_status()$`Post Construction Status`[input$status_selected])
+
+        # Switch to the "Add/Edit Post-Construction Status" tab
+        updateTabsetPanel(session, "TabPanelID", selected = "add_edit")
+      }
+    })
+
+    #Modify the 'system_id' select input to use the reactiveVal
+    observe({
+      if (!is.null(selected_system_id())) {
+        updateSelectInput(session, "system_id", selected = selected_system_id())
+        updateSelectInput(session, "status_edit", selected = selected_status())
+        
+      }
+    })
+
   }
   
   # Complete app with UI and server components
