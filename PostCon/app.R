@@ -148,14 +148,14 @@
         
        postcon_status_current %>%
         inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
-        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq)
+        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
         
       } else{
         
        postcon_status_current %>%
           inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
           filter(status == input$status) %>%
-          select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq)
+          select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
         
       }
     )
@@ -166,7 +166,7 @@
       postcon_status_current %>%
         inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
         filter(status_date >= as.Date(rv$start_date()) & status_date <= as.Date(rv$end_date())) %>%
-        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq)
+        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
       
       } else {
         
@@ -174,7 +174,7 @@
           inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
           filter(status_date >= as.Date(rv$start_date()) & status_date <= as.Date(rv$end_date())) %>%
           filter(status == input$status) %>%
-          select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq)
+          select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
         
       }
     )
@@ -183,7 +183,7 @@
     rv$pc_status <- reactive(ifelse(input$date_range == "To-Date", return(rv$pc_status_todate()), return(rv$pc_status__q())))
 
     output$postcon_table <- renderReactable(
-      reactable(rv$pc_status(), 
+      reactable(rv$pc_status() %>% select(-postcon_status_uid), 
                 fullWidth = TRUE,
                 selection = "single",
                 searchable = TRUE,
@@ -195,7 +195,7 @@
                 defaultPageSize = 25,
                 height = 1000, 
                 details = function(index) {
-                  nested_notes <- postcon_notes[postcon_notes$system_id == rv$pc_status()$`System ID`[index], ] %>%
+                  nested_notes <- postcon_notes[postcon_notes$postcon_status_uid == rv$pc_status()$postcon_status_uid[index], ] %>%
                     arrange(desc(note_date)) %>%
                     select(`Note Date`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
