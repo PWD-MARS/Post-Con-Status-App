@@ -135,7 +135,11 @@
               
                      ),
                      mainPanel(
-                      
+                       conditionalPanel(condition = "input.system_id",
+                                        h4(textOutput("current_header")),
+                                        reactableOutput("sys_current_pc_table"),
+                                        h4(textOutput("past_header")), 
+                                        reactableOutput("sys_past_pc_table"))
                      )
                    ))
   )
@@ -262,6 +266,80 @@
         
       }
     })
+    
+    
+    #table header-current
+    output$current_header <- renderText(
+      paste("Current Post Construction Status for System ", input$system_id)
+    )
+    #table header-past
+    output$past_header <- renderText(
+      paste("Previous Post Construction Status for System ", input$system_id)
+    )
+    
+    
+    # current table 
+    output$sys_current_pc_table <- renderReactable(
+      reactable(rv$pc_status() %>%
+                  select(-postcon_status_uid) %>%
+                  filter(`System ID` == input$system_id), 
+                fullWidth = TRUE,
+                selection = "single",
+                searchable = TRUE,
+                onClick = "select",
+                selectionId = "current_status_selected",
+                #searchable = TRUE,
+                showPageSizeOptions = TRUE,
+                pageSizeOptions = c(25, 50, 100),
+                defaultPageSize = 25,
+                height = 400, 
+                details = function(index) {
+                  nested_notes <- postcon_notes[postcon_notes$postcon_status_uid == rv$pc_status()$postcon_status_uid[index], ] %>%
+                    arrange(desc(note_date)) %>%
+                    select(`Note Date`= note_date, Notes = notes)
+                  htmltools::div(style = "padding: 1rem",
+                                 reactable(nested_notes, columns = list(
+                                   `Note Date` = colDef(width = 100),
+                                   Notes = colDef(width = 500)
+                                 ), outlined = TRUE)
+                  )
+                }
+                
+      ))
+      
+      
+      
+    # past table
+    output$sys_past_pc_table <- renderReactable(
+      reactable(rv$pc_status() %>% 
+                  filter(postcon_status_uid %!in% postcon_status_current$postcon_status_uid) %>%
+                  select(-postcon_status_uid) %>%
+                  filter(`System ID` == input$system_id), 
+                fullWidth = TRUE,
+                selection = "single",
+                searchable = TRUE,
+                onClick = "select",
+                selectionId = "past_status_selected",
+                #searchable = TRUE,
+                showPageSizeOptions = TRUE,
+                pageSizeOptions = c(25, 50, 100),
+                defaultPageSize = 25,
+                height = 400, 
+                details = function(index) {
+                  nested_notes <- postcon_notes[postcon_notes$postcon_status_uid == rv$pc_status()$postcon_status_uid[index], ] %>%
+                    arrange(desc(note_date)) %>%
+                    select(`Note Date`= note_date, Notes = notes)
+                  htmltools::div(style = "padding: 1rem",
+                                 reactable(nested_notes, columns = list(
+                                   `Note Date` = colDef(width = 100),
+                                   Notes = colDef(width = 500)
+                                 ), outlined = TRUE)
+                  )
+                }
+                
+      ))
+
+
 
   }
   
