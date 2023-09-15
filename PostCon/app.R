@@ -57,7 +57,11 @@
 #current status
   postcon_status_current <- postcon_status %>%
     group_by(system_id) %>%
-    summarise(postcon_status_uid, postcon_status_lookup_uid, status_date = max(status_date), fq)
+    dplyr::summarise(status_date = max(status_date)) %>%
+    ungroup
+  
+  postcon_status_current <- postcon_status_current %>%
+    inner_join(postcon_status, by = c("system_id"="system_id","status_date"="status_date"))
   
   
 #post-con status types
@@ -161,6 +165,9 @@
     output$table_name <- renderText(ifelse(input$date_range == "To-Date", paste("Current Post-Con Status to Date:", input$status), paste("Current Post-Con Status", " Assigned between ", rv$start_date(), " and ", rv$end_date(),": ",input$status, sep = "")))
     
 ### First tab: Post-Construction Status Table
+    
+
+
     # todate 
     rv$pc_status_todate <- reactive(
       if(input$status == ""){
@@ -220,7 +227,7 @@
                   htmltools::div(style = "padding: 1rem",
                                  reactable(nested_notes, columns = list(
                                    `Note Date` = colDef(width = 100),
-                                    Notes = colDef(width = 1050)
+                                    Notes = colDef(width = 1000)
                                  ), outlined = TRUE)
                   )
                 }
@@ -242,6 +249,10 @@
         write.xlsx(x = df_list , file = filename)
       }
     )
+    
+    
+### Second tab: ADD/EDIT Post-Construction Status 
+    
     
     # Create a reactiveVal to store the selected system_id
     selected_system_id <- reactiveVal(NULL)
@@ -277,12 +288,35 @@
       paste("Previous Post Construction Status for System ", input$system_id)
     )
     
+
+    
+    # current Post-con of a system
+    rv$Current_sys_status <- reactive(
+      
+      postcon_status_current %>%
+        inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
+        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid) %>%
+        filter(`System ID` == input$system_id)
+      
+    )
+    
+    # all post-cons of a system
+    rv$all_sys_status <- reactive(
+      
+      postcon_status %>%
+        inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
+        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid) %>%
+        filter(postcon_status_uid %!in% postcon_status_current$postcon_status_uid) %>%
+        filter(`System ID` == input$system_id) %>%
+        arrange(desc(`Date Assigned`))
+      
+    )
+    
     
     # current table 
     output$sys_current_pc_table <- renderReactable(
-      reactable(rv$pc_status() %>%
-                  select(-postcon_status_uid) %>%
-                  filter(`System ID` == input$system_id), 
+      reactable(rv$Current_sys_status()  %>%
+                  select(-postcon_status_uid),
                 fullWidth = TRUE,
                 selection = "single",
                 searchable = TRUE,
@@ -298,10 +332,15 @@
                     arrange(desc(note_date)) %>%
                     select(`Note Date`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
-                                 reactable(nested_notes, columns = list(
-                                   `Note Date` = colDef(width = 100),
-                                   Notes = colDef(width = 500)
-                                 ), outlined = TRUE)
+                                 reactable(nested_notes,
+                                           columns = list(
+                                                          `Note Date` = colDef(width = 100),
+                                                           Notes = colDef(width = 1000)
+                                 ), 
+                                 selection = "single",
+                                 onClick = "select",
+                                 selectionId = "current_status_note_selected",
+                                 outlined = TRUE)
                   )
                 }
                 
@@ -311,10 +350,8 @@
       
     # past table
     output$sys_past_pc_table <- renderReactable(
-      reactable(rv$pc_status() %>% 
-                  filter(postcon_status_uid %!in% postcon_status_current$postcon_status_uid) %>%
-                  select(-postcon_status_uid) %>%
-                  filter(`System ID` == input$system_id), 
+      reactable(rv$all_sys_status() %>% 
+                  select(-postcon_status_uid),
                 fullWidth = TRUE,
                 selection = "single",
                 searchable = TRUE,
@@ -326,18 +363,30 @@
                 defaultPageSize = 25,
                 height = 400, 
                 details = function(index) {
-                  nested_notes <- postcon_notes[postcon_notes$postcon_status_uid == rv$pc_status()$postcon_status_uid[index], ] %>%
+                  nested_notes <- postcon_notes[postcon_notes$postcon_status_uid == rv$all_sys_status()$postcon_status_uid[index], ] %>%
                     arrange(desc(note_date)) %>%
                     select(`Note Date`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
-                                 reactable(nested_notes, columns = list(
-                                   `Note Date` = colDef(width = 100),
-                                   Notes = colDef(width = 500)
-                                 ), outlined = TRUE)
+                                 reactable(nested_notes, 
+                                           columns = list(
+                                                     `Note Date` = colDef(width = 100),
+                                                      Notes = colDef(width = 1000)
+                                                       ), 
+                                           selection = "single",
+                                           onClick = "select",
+                                           selectionId = "past_status_note_selected",
+                                           outlined = TRUE)
                   )
                 }
                 
       ))
+    
+    
+    
+    
+    
+    
+    
 
 
 
