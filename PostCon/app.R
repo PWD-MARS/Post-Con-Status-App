@@ -266,11 +266,11 @@
         # Get the selected System ID from the clicked row
         selected_system_id(rv$pc_status()$`System ID`[input$status_selected])
         selected_status(rv$pc_status()$`Post Construction Status`[input$status_selected])
-        selected_note(postcon_notes %>%
-                        filter(postcon_status_uid == rv$pc_status()$postcon_status_uid[input$status_selected]) %>%
-                        filter(note_date == max(note_date)) %>%
-                        select(notes) %>%
-                        pull) 
+        # selected_note(postcon_notes %>%
+        #                 filter(postcon_status_uid == rv$pc_status()$postcon_status_uid[input$status_selected]) %>%
+        #                 filter(note_date == max(note_date)) %>%
+        #                 select(notes) %>%
+        #                 pull) 
         # Switch to the "Add/Edit Post-Construction Status" tab
         updateTabsetPanel(session, "TabPanelID", selected = "add_edit")
       }
@@ -281,7 +281,9 @@
       if (!is.null(selected_system_id())) {
         updateSelectInput(session, "system_id", selected = selected_system_id())
         updateSelectInput(session, "status_edit", selected = selected_status())
-        updateTextAreaInput(session, "note", value = selected_note())
+        updateSelectInput(session, "date", selected = Sys.Date())
+        
+        # updateTextAreaInput(session, "note", value = selected_note())
         
         
       }
@@ -337,7 +339,7 @@
                 defaultPageSize = 25,
                 height = 400, 
                 details = function(index) {
-                  nested_notes <- postcon_notes[postcon_notes$postcon_status_uid == rv$pc_status()$postcon_status_uid[index], ] %>%
+                  nested_notes <- postcon_notes[postcon_notes$postcon_status_uid == rv$Current_sys_status()$postcon_status_uid[index], ] %>%
                     arrange(desc(note_date)) %>%
                     select(`Note Date`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
@@ -391,6 +393,31 @@
       ))
     
     
+    # 
+    # #when a system id is selected 
+    # observeEvent(input$system_id, {
+    #   #deselect from other tables
+    # 
+    #   selected_system_id(input$system_id)
+    #   selected_status(rv$Current_sys_status()$`Post Construction Status`)
+    #   selected_date(rv$Current_sys_status()$`Date Assigned`)
+    #   selected_note(postcon_notes %>%
+    #                   filter(postcon_status_uid == rv$Current_sys_status()$postcon_status_uid) %>%
+    #                   filter(note_date == max(note_date)) %>%
+    #                   select(notes) %>%
+    #                   pull) 
+    #   
+    #   updateSelectInput(session, "system_id", selected = selected_system_id())
+    #   updateSelectInput(session, "status_edit", selected = selected_status())
+    #   updateSelectInput(session, "date", selected = selected_date())
+    #   updateTextAreaInput(session, "note", value = selected_note())
+    #   
+    #   
+    #   
+    #   
+    # })
+    
+    
     #when a row any of the tables in add/edit is clicked
     observeEvent(input$current_status_selected, {
       #deselect from other tables
@@ -399,16 +426,16 @@
       selected_system_id(rv$Current_sys_status()$`System ID`[input$current_status_selected])
       selected_status(rv$Current_sys_status()$`Post Construction Status`[input$current_status_selected])
       selected_date(rv$Current_sys_status()$`Date Assigned`[input$current_status_selected])
-      selected_note(postcon_notes %>%
-                      filter(postcon_status_uid == rv$Current_sys_status()$postcon_status_uid[input$current_status_selected]) %>%
-                      filter(note_date == max(note_date)) %>%
-                      select(notes) %>%
-                      pull) 
+      # selected_note(postcon_notes %>%
+      #                 filter(postcon_status_uid == rv$Current_sys_status()$postcon_status_uid[input$current_status_selected]) %>%
+      #                 filter(note_date == max(note_date)) %>%
+      #                 select(notes) %>%
+      #                 pull) 
       
       updateSelectInput(session, "system_id", selected = selected_system_id())
       updateSelectInput(session, "status_edit", selected = selected_status())
       updateSelectInput(session, "date", selected = selected_date())
-      updateTextAreaInput(session, "note", value = selected_note())
+      # updateTextAreaInput(session, "note", value = selected_note())
       
       
       
@@ -424,17 +451,17 @@
       selected_system_id(rv$all_sys_status()$`System ID`[input$past_status_selected])
       selected_status(rv$all_sys_status()$`Post Construction Status`[input$past_status_selected])
       selected_date(rv$all_sys_status()$`Date Assigned`[input$past_status_selected])
-      selected_note(postcon_notes %>%
-                      filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
-                      filter(note_date == max(note_date)) %>%
-                      select(notes) %>%
-                      pull) 
+      # selected_note(postcon_notes %>%
+      #                 filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
+      #                 filter(note_date == max(note_date)) %>%
+      #                 select(notes) %>%
+      #                 pull) 
       
       
       updateSelectInput(session, "system_id", selected = selected_system_id())
       updateSelectInput(session, "status_edit", selected = selected_status())
       updateSelectInput(session, "date", selected = selected_date())
-      updateTextAreaInput(session, "note", value = selected_note())
+      # updateTextAreaInput(session, "note", value = selected_note())
       
       
       
