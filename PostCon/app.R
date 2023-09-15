@@ -337,9 +337,9 @@
                                                           `Note Date` = colDef(width = 100),
                                                            Notes = colDef(width = 1000)
                                  ), 
-                                 selection = "single",
-                                 onClick = "select",
-                                 selectionId = "current_status_note_selected",
+                                 # selection = "single",
+                                 # onClick = "select",
+                                 # selectionId = "current_status_note_selected",
                                  outlined = TRUE)
                   )
                 }
@@ -372,9 +372,9 @@
                                                      `Note Date` = colDef(width = 100),
                                                       Notes = colDef(width = 1000)
                                                        ), 
-                                           selection = "single",
-                                           onClick = "select",
-                                           selectionId = "past_status_note_selected",
+                                           # selection = "single",
+                                           # onClick = "select",
+                                           # selectionId = "past_status_note_selected",
                                            outlined = TRUE)
                   )
                 }
@@ -382,7 +382,24 @@
       ))
     
     
+    #when a row any of the tables in add/edit is clicked
+    observeEvent(input$current_status_selected, {
+      #deselect from other tables
+      updateReactable("sys_past_pc_table", selected = NA)
+
+    })
+
     
+    #when a row any of the tables in add/edit is clicked
+    observeEvent(input$past_status_selected, {
+      #deselect from other tables
+      updateReactable("sys_current_pc_table", selected = NA)
+
+    })
+    
+    
+ 
+
     
     
     
