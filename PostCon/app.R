@@ -419,20 +419,37 @@
                         filter(`System ID` == input$system_id) %>% 
                         select(`Post Construction Status`) %>%
                         pull)
+      
       selected_note(recent_notes %>%
                       filter(system_id == input$system_id) %>%
                       select(notes) %>%
                       pull)
+      
       selected_date(recent_notes_date %>%
                       filter(system_id == input$system_id) %>%
                       select(note_date) %>%
                       pull)
+
+      cat(length(selected_note()))
       
-      cat(selected_date())
+      # updateSelectInput(session, "status_edit", selected = selected_status())
+      # updateSelectInput(session, "date", selected = selected_date())
+      # updateTextAreaInput(session, "note", value = selected_note())
       
-      updateSelectInput(session, "status_edit", selected = selected_status())
-      updateSelectInput(session, "date", selected = selected_date())
-      updateTextAreaInput(session, "note", value = selected_note())
+      if(input$system_id %!in% rv$Current_sys_status()$`System ID`){
+        
+        updateSelectInput(session, "status_edit", selected = "")
+        updateSelectInput(session, "date", selected = Sys.Date())
+        updateTextAreaInput(session, "note", value = "")
+      
+      } else{
+        
+        updateSelectInput(session, "status_edit", selected = selected_status())
+        updateSelectInput(session, "date", selected = selected_date())
+        updateTextAreaInput(session, "note", value = selected_note())
+        
+        
+      }
         
     })
     
