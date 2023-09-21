@@ -451,7 +451,12 @@
       
       selected_system_id(rv$Current_sys_status()$`System ID`[input$current_status_selected])
       selected_status(rv$Current_sys_status()$`Post Construction Status`[input$current_status_selected])
-      selected_date(rv$Current_sys_status()$`Date Assigned`[input$current_status_selected])
+      # selected_date(rv$Current_sys_status()$`Date Assigned`[input$current_status_selected])
+      selected_date(postcon_notes %>%
+                      filter(postcon_status_uid == rv$Current_sys_status()$postcon_status_uid[input$current_status_selected]) %>%
+                      filter(note_date == max(note_date)) %>%
+                      select(note_date) %>%
+                      pull)
       selected_note(postcon_notes %>%
                        filter(postcon_status_uid == rv$Current_sys_status()$postcon_status_uid[input$current_status_selected]) %>%
                        filter(note_date == max(note_date)) %>%
@@ -476,7 +481,12 @@
       
       selected_system_id(rv$all_sys_status()$`System ID`[input$past_status_selected])
       selected_status(rv$all_sys_status()$`Post Construction Status`[input$past_status_selected])
-      selected_date(rv$all_sys_status()$`Date Assigned`[input$past_status_selected])
+      #selected_date(rv$all_sys_status()$`Date Assigned`[input$past_status_selected])
+      selected_date(postcon_notes %>%
+                      filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
+                      filter(note_date == max(note_date)) %>%
+                      select(note_date) %>%
+                      pull)
       selected_note(postcon_notes %>%
                       filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
                       filter(note_date == max(note_date)) %>%
