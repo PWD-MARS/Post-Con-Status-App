@@ -39,7 +39,6 @@
 #gets environmental variables saved in local or pwdrstudio environment
   poolConn <- dbPool(odbc(), dsn = "mars14_data", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
 
-
 #disconnect from db on stop 
   onStop(function(){
     poolClose(poolConn)
@@ -71,7 +70,6 @@
     group_by(system_id) %>%
     summarise(notes = notes[1])
   
-  
 # Date of Most recent note of most recent stats
   recent_notes_date <- postcon_status_current %>%
     inner_join(postcon_notes, by = "postcon_status_uid") %>%
@@ -79,9 +77,7 @@
     arrange(desc(note_date)) %>%
     group_by(system_id) %>%
     summarise(note_date = note_date[1])
-  
 
-  
 #post-con status types
   postcon_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup")
   
@@ -114,7 +110,7 @@
   years <- start_fy:current_fy %>% sort(decreasing = TRUE)
   
   # Define UI
-  ui <- navbarPage("Post-Construction Status", id = "TabPanelID",
+  ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID",
                    #1.1 Unmonitored Active SMPs -------
                    tabPanel("Post-Construction Status Table", value = "status", 
                             titlePanel("Current Post-Construction Status Table"),
@@ -152,7 +148,9 @@
                        selectInput("system_id", "System ID", choices = c("", system_id_all) , selected = ""),
                        selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = ""),
                        dateInput("date",label = "Date",value = NULL),
-                       textAreaInput("note", "Post-Construction Note:", height = '85px')
+                       textAreaInput("note", "Post-Construction Note:", height = '85px'),
+                       actionButton("clear_pcs", "Clear All Fields")
+                       
                        
               
                      ),
@@ -164,6 +162,7 @@
                                         reactableOutput("sys_past_pc_table"))
                      )
                    ))
+  )
   )
   
   # Server logic
@@ -179,13 +178,10 @@
     rv$start_date <- reactive(lubridate::mdy(paste0(input$start_quarter, "/", ifelse(input$start_quarter == "7/1" | input$start_quarter == "10/1", as.numeric(input$start_fy)-1,input$start_fy))))
     rv$end_date <- reactive(lubridate::mdy(paste0(input$end_quarter, "/", ifelse(input$end_quarter == "9/30" | input$end_quarter == "12/31", as.numeric(input$end_fy)-1,input$end_fy))))
 
-    
     output$table_name <- renderText(ifelse(input$date_range == "To-Date", paste("Current Post-Con Status to Date:", input$status), paste("Current Post-Con Status", " Assigned between ", rv$start_date(), " and ", rv$end_date(),": ",input$status, sep = "")))
     
 ### First tab: Post-Construction Status Table
     
-
-
     # todate 
     rv$pc_status_todate <- reactive(
       if(input$status == ""){
@@ -223,7 +219,6 @@
       }
     )
     
-    
     rv$pc_status <- reactive(ifelse(input$date_range == "To-Date", return(rv$pc_status_todate()), return(rv$pc_status__q())))
 
     output$postcon_table <- renderReactable(
@@ -252,9 +247,6 @@
                 
       ))
     
-    
-    
-    
     #download button
     output$download_table <- downloadHandler(
       
@@ -267,18 +259,14 @@
         write.xlsx(x = df_list , file = filename)
       }
     )
-    
-    
 ### Second tab: ADD/EDIT Post-Construction Status 
-    
     
     # Create a reactiveVal to store the selected system_id
     selected_system_id <- reactiveVal(NULL)
     selected_status <- reactiveVal(NULL)
     selected_date <- reactiveVal(NULL)
     selected_note <- reactiveVal(NULL)
-    
-    
+  
     observeEvent(input$status_selected, {
       if (!is.null(input$status_selected)) {
         # Get the selected System ID from the clicked row
@@ -305,8 +293,7 @@
         
       }
     })
-    
-    
+  
     #table header-current
     output$current_header <- renderText(
       paste("Current Post Construction Status for System ", input$system_id)
@@ -315,8 +302,6 @@
     output$past_header <- renderText(
       paste("Previous Post Construction Status for System ", input$system_id)
     )
-    
-
     
     # current Post-con of a system
     rv$Current_sys_status <- reactive(
@@ -339,7 +324,6 @@
         arrange(desc(`Date Assigned`))
       
     )
-    
     
     # current table 
     output$sys_current_pc_table <- renderReactable(
@@ -365,16 +349,11 @@
                                                           `Note Date` = colDef(width = 100),
                                                            Notes = colDef(width = 1000)
                                  ), 
-                                 # selection = "single",
-                                 # onClick = "select",
-                                 # selectionId = "current_status_note_selected",
                                  outlined = TRUE)
                   )
                 }
                 
       ))
-      
-      
       
     # past table
     output$sys_past_pc_table <- renderReactable(
@@ -400,46 +379,23 @@
                                                      `Note Date` = colDef(width = 100),
                                                       Notes = colDef(width = 1000)
                                                        ), 
-                                           # selection = "single",
-                                           # onClick = "select",
-                                           # selectionId = "past_status_note_selected",
                                            outlined = TRUE)
                   )
                 }
                 
       ))
     
-    
-    # 
-    # #when a system id is selected 
+    # when a system id is selected 
     observeEvent(input$system_id, {
-      #cat("Event triggered!\n") 
+      cat("hahahah")
       
-      selected_status(rv$Current_sys_status() %>% 
-                        filter(`System ID` == input$system_id) %>% 
-                        select(`Post Construction Status`) %>%
-                        pull)
+      # reset("status_edit")
+      # reset("date")
+      # reset("note")
       
-      selected_note(recent_notes %>%
-                      filter(system_id == input$system_id) %>%
-                      select(notes) %>%
-                      pull)
-      
-      selected_date(recent_notes_date %>%
-                      filter(system_id == input$system_id) %>%
-                      select(note_date) %>%
-                      pull)
-      
-      if(input$system_id %!in% rv$Current_sys_status()$`System ID`){
-        updateSelectInput(session, "status_edit", selected = "")
-        updateSelectInput(session, "date", selected = Sys.Date())
-        updateTextAreaInput(session, "note", value = "")
-      } else{
-        updateSelectInput(session, "status_edit", selected = selected_status())
-        updateSelectInput(session, "date", selected = selected_date())
-        updateTextAreaInput(session, "note", value = selected_note())
-        
-      }
+      updateSelectInput(session, "status_edit", selected = "")
+      updateSelectInput(session, "date", selected = Sys.Date())
+      updateTextAreaInput(session, "note", value = "")
         
     })
     
@@ -448,28 +404,19 @@
     observeEvent(input$current_status_selected, {
       #deselect from other tables
       updateReactable("sys_past_pc_table", selected = NA)
-      
-      selected_system_id(rv$Current_sys_status()$`System ID`[input$current_status_selected])
       selected_status(rv$Current_sys_status()$`Post Construction Status`[input$current_status_selected])
-      # selected_date(rv$Current_sys_status()$`Date Assigned`[input$current_status_selected])
-      selected_date(postcon_notes %>%
-                      filter(postcon_status_uid == rv$Current_sys_status()$postcon_status_uid[input$current_status_selected]) %>%
-                      filter(note_date == max(note_date)) %>%
+      selected_date(recent_notes_date %>%
+                      filter(system_id == input$system_id) %>%
                       select(note_date) %>%
                       pull)
-      selected_note(postcon_notes %>%
-                       filter(postcon_status_uid == rv$Current_sys_status()$postcon_status_uid[input$current_status_selected]) %>%
-                       filter(note_date == max(note_date)) %>%
-                       select(notes) %>%
-                       pull) 
+      selected_note(recent_notes %>%
+                      filter(system_id == input$system_id) %>%
+                      select(notes) %>%
+                      pull) 
       
-      updateSelectInput(session, "system_id", selected = selected_system_id())
       updateSelectInput(session, "status_edit", selected = selected_status())
-      updateSelectInput(session, "date", selected = selected_date())
       updateTextAreaInput(session, "note", value = selected_note())
-      
-      
-      
+      updateSelectInput(session, "date", selected = selected_date())
 
     })
 
@@ -479,42 +426,49 @@
       #deselect from other tables
       updateReactable("sys_current_pc_table", selected = NA)
       
-      selected_system_id(rv$all_sys_status()$`System ID`[input$past_status_selected])
+      # selected_system_id(rv$all_sys_status()$`System ID`[input$past_status_selected])
       selected_status(rv$all_sys_status()$`Post Construction Status`[input$past_status_selected])
-      #selected_date(rv$all_sys_status()$`Date Assigned`[input$past_status_selected])
+      # selected_date(rv$all_sys_status()$`Date Assigned`[input$past_status_selected])
       selected_date(postcon_notes %>%
                       filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
-                      filter(note_date == max(note_date)) %>%
+                      arrange((desc(note_date))) %>%
                       select(note_date) %>%
-                      pull)
+                      pull %>%
+                      .[1])
       selected_note(postcon_notes %>%
                       filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
-                      filter(note_date == max(note_date)) %>%
+                      arrange((desc(note_date))) %>%
                       select(notes) %>%
-                      pull)
+                      pull %>%
+                      .[1])
       
-      
-      updateSelectInput(session, "system_id", selected = selected_system_id())
+      # updateSelectInput(session, "system_id", selected = selected_system_id())
       updateSelectInput(session, "status_edit", selected = selected_status())
-      updateSelectInput(session, "date", selected = selected_date())
       updateTextAreaInput(session, "note", value = selected_note())
+      updateSelectInput(session, "date", selected = selected_date())
       
-      
-      
-
     })
     
     
+    observeEvent(input$clear_pcs, {
+      showModal(modalDialog(title = "Clear All Fields", 
+                            "Are you sure you want to clear all fields on this tab?", 
+                            modalButton("No"), 
+                            actionButton("confirm_clear_pcs", "Yes")))
+    })
     
     
-    
- 
-
-    
-    
-    
-    
-
+    observeEvent(input$confirm_clear_pcs, {
+      reset("system_id")
+      reset("status_edit")
+      reset("date")
+      reset("note")
+      reset("current_header")
+      reset("sys_current_pc_table")
+      reset("past_header")
+      reset("sys_past_pc_table")
+      removeModal()
+    })
 
 
   }
