@@ -271,12 +271,12 @@
       if (!is.null(input$status_selected)) {
         # Get the selected System ID from the clicked row
         selected_system_id(rv$pc_status()$`System ID`[input$status_selected])
-        selected_status(rv$pc_status()$`Post Construction Status`[input$status_selected])
-        selected_note(postcon_notes %>%
-                        filter(postcon_status_uid == rv$pc_status()$postcon_status_uid[input$status_selected]) %>%
-                        filter(note_date == max(note_date)) %>%
-                        select(notes) %>%
-                        pull)
+        # selected_status(rv$pc_status()$`Post Construction Status`[input$status_selected])
+        # selected_note(postcon_notes %>%
+        #                 filter(postcon_status_uid == rv$pc_status()$postcon_status_uid[input$status_selected]) %>%
+        #                 filter(note_date == max(note_date)) %>%
+        #                 select(notes) %>%
+        #                 pull)
         # Switch to the "Add/Edit Post-Construction Status" tab
         updateTabsetPanel(session, "TabPanelID", selected = "add_edit")
       }
@@ -387,8 +387,7 @@
     
     # when a system id is selected 
     observeEvent(input$system_id, {
-      cat("hahahah")
-      
+
       # reset("status_edit")
       # reset("date")
       # reset("note")
