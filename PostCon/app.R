@@ -146,13 +146,16 @@
                      
                      sidebarPanel(
                        selectInput("system_id", "System ID", choices = c("", system_id_all) , selected = ""),
-                       selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = ""),
+                       conditionalPanel(condition = "input.create_status === false", selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = "")),
+                       checkboxInput("create_status","Create New Post-Con Status?", 
+                                     value = FALSE),
+                       conditionalPanel(condition = "input.create_status === true", 
+                                        textAreaInput("new_status", "New Post Construction Status:", height = '50px')),                       
                        dateInput("date",label = "Date",value = NULL),
                        textAreaInput("note", "Post-Construction Note:", height = '85px'),
+                       disabled(actionButton("save_edit", "Save The Post-Con Status/Notes")),
                        actionButton("clear_pcs", "Clear All Fields")
                        
-                       
-              
                      ),
                      mainPanel(
                        conditionalPanel(condition = "input.system_id",
@@ -392,11 +395,24 @@
       # reset("date")
       # reset("note")
       
+   
       updateSelectInput(session, "status_edit", selected = "")
       updateSelectInput(session, "date", selected = Sys.Date())
       updateTextAreaInput(session, "note", value = "")
         
     })
+    
+    # reset status if new status is being created
+    observeEvent(input$create_status == TRUE,{
+      reset("status_edit")
+      disable("save_edit")
+      })
+    
+    
+    # system_id, data, and post_con status field can't remain blank
+    observe(toggleState(id = "save_edit", (input$system_id != "" 
+                                           & length(input$date) > 0
+                                           & (input$status_edit != "" |(input$create_status == TRUE & input$new_status !="" )))))
     
     
     #when a row any of the tables in add/edit is clicked
@@ -416,6 +432,8 @@
       updateSelectInput(session, "status_edit", selected = selected_status())
       updateTextAreaInput(session, "note", value = selected_note())
       updateSelectInput(session, "date", selected = selected_date())
+      reset("create_status")
+      reset("new_status")      
 
     })
 
@@ -445,6 +463,8 @@
       updateSelectInput(session, "status_edit", selected = selected_status())
       updateTextAreaInput(session, "note", value = selected_note())
       updateSelectInput(session, "date", selected = selected_date())
+      reset("create_status")
+      reset("new_status")      
       
     })
     
@@ -466,8 +486,41 @@
       reset("sys_current_pc_table")
       reset("past_header")
       reset("sys_past_pc_table")
+      reset("create_status")
+      reset("new_status")
       removeModal()
     })
+    
+    
+    #add/edit button toggle
+    rv$label <- reactive(if(length(input$current_status_selected) == 0 & length(input$past_status_selected) == 0) "Save The Post-Con Status/Notes" else "Edit Selected")
+    observe(updateActionButton(session, "save_edit", label = rv$label()))
+    
+    
+    
+    
+    ### On click "save_edit"
+    
+    # observeEvent(input$add_ppt, {
+    #   
+    #   if(length(input$current_status_selected) == 0 & length(input$past_status_selected) == 0){
+    #     if(input$create_status == FALSE){
+    #       
+    #       new_status <- data.frame(system_id = input$system_id,
+    #                                postcon_status_lookup_uid = ,
+    #                                status_date = )
+    #       
+    #       
+    #       
+    #       
+    #       
+    #       
+    #     }
+    #   }
+    # }
+    # )
+        
+      
 
 
   }
