@@ -425,11 +425,11 @@
       #deselect from other tables
       updateReactable("sys_past_pc_table", selected = NA)
       selected_status(rv$Current_sys_status()$`Post Construction Status`[input$current_status_selected])
-      selected_date(recent_notes_date %>%
+      selected_date(rv$recent_notes_date() %>%
                       filter(system_id == input$system_id) %>%
                       select(note_date) %>%
                       pull)
-      selected_note(recent_notes %>%
+      selected_note(rv$recent_notes() %>%
                       filter(system_id == input$system_id) %>%
                       select(notes) %>%
                       pull) 
@@ -451,13 +451,13 @@
       # selected_system_id(rv$all_sys_status()$`System ID`[input$past_status_selected])
       selected_status(rv$all_sys_status()$`Post Construction Status`[input$past_status_selected])
       # selected_date(rv$all_sys_status()$`Date Assigned`[input$past_status_selected])
-      selected_date(postcon_notes %>%
+      selected_date(rv$postcon_notes() %>%
                       filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
                       arrange((desc(note_date))) %>%
                       select(note_date) %>%
                       pull %>%
                       .[1])
-      selected_note(postcon_notes %>%
+      selected_note(rv$postcon_notes() %>%
                       filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
                       arrange((desc(note_date))) %>%
                       select(notes) %>%
