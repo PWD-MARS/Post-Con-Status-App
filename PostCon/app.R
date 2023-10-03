@@ -61,10 +61,7 @@
     dplyr::summarise(status_date = max(status_date)) %>%
     ungroup %>%
     inner_join(postcon_status, by = c("system_id"="system_id","status_date"="status_date"))
-  
-  
-  # postcon_status_current <- postcon_status_current %>%
-  #   inner_join(postcon_status, by = c("system_id"="system_id","status_date"="status_date"))
+
 
 # Most recent note of most recent stats
   recent_notes <- postcon_status_current %>%
@@ -508,6 +505,8 @@
     ### On click "save_edit"
     
     observeEvent(input$save_edit, {
+
+      
       
       # get the uid
       pc_uid <-  postcon_status %>%
@@ -534,6 +533,7 @@
           odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status"), new_status, append= TRUE, row.names = FALSE )
           odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_notes"), new_note, append= TRUE, row.names = FALSE )
           
+
           
           
           
