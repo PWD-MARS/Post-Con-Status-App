@@ -26,6 +26,7 @@
   library(reactable)
   #excel download
   library(xlsx)
+  library(DBI)
 #Not in logical
   `%!in%` <- Negate(`%in%`)
 
@@ -47,6 +48,7 @@
 #js warning about leaving page
   jscode <- 'window.onbeforeunload = function() { return "Please use the button on the webpage"; };'
 
+
 # load required tables here
 #post-con status notes
   postcon_notes <- dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(note_date) as fq from fieldwork.tbl_postcon_notes")
@@ -57,10 +59,12 @@
   postcon_status_current <- postcon_status %>%
     group_by(system_id) %>%
     dplyr::summarise(status_date = max(status_date)) %>%
-    ungroup
-  
-  postcon_status_current <- postcon_status_current %>%
+    ungroup %>%
     inner_join(postcon_status, by = c("system_id"="system_id","status_date"="status_date"))
+  
+  
+  # postcon_status_current <- postcon_status_current %>%
+  #   inner_join(postcon_status, by = c("system_id"="system_id","status_date"="status_date"))
 
 # Most recent note of most recent stats
   recent_notes <- postcon_status_current %>%
@@ -399,6 +403,8 @@
       updateSelectInput(session, "status_edit", selected = "")
       updateSelectInput(session, "date", selected = Sys.Date())
       updateTextAreaInput(session, "note", value = "")
+      reset("create_status")
+      reset("new_status")
         
     })
     
@@ -501,25 +507,40 @@
     
     ### On click "save_edit"
     
-    # observeEvent(input$add_ppt, {
-    #   
-    #   if(length(input$current_status_selected) == 0 & length(input$past_status_selected) == 0){
-    #     if(input$create_status == FALSE){
-    #       
-    #       new_status <- data.frame(system_id = input$system_id,
-    #                                postcon_status_lookup_uid = ,
-    #                                status_date = )
-    #       
-    #       
-    #       
-    #       
-    #       
-    #       
-    #     }
-    #   }
-    # }
-    # )
-        
+    observeEvent(input$save_edit, {
+      
+      # get the uid
+      pc_uid <-  postcon_status %>%
+        select(postcon_status_uid) %>%
+        pull %>%
+        max + 1
+      
+      if(length(input$current_status_selected) == 0 & length(input$past_status_selected) == 0){
+        if(input$create_status == FALSE){
+          
+          new_status <- data.frame(system_id = input$system_id,
+                                   postcon_status_lookup_uid = postcon_status_lookup %>%
+                                     filter(status == input$status_edit) %>%
+                                     select(postcon_status_lookup_uid) %>%
+                                     pull,
+                                   status_date = input$date,
+                                   postcon_status_uid = pc_uid)
+          
+          new_note <- data.frame(note_date = input$date,
+                                 notes = input$note,
+                                 postcon_status_uid = pc_uid)
+          
+          
+          odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status"), new_status, append= TRUE, row.names = FALSE )
+          odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_notes"), new_note, append= TRUE, row.names = FALSE )
+          
+          
+          
+          
+        }
+      }
+    }
+    )
       
 
 
