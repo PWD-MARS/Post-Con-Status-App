@@ -48,46 +48,10 @@
 #js warning about leaving page
   jscode <- 'window.onbeforeunload = function() { return "Please use the button on the webpage"; };'
 
-
-# load required tables here
-#post-con status notes
-  postcon_notes <- dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(note_date) as fq from fieldwork.tbl_postcon_notes")
-  
-#post-con status 
-  postcon_status <- dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(status_date) as fq from fieldwork.tbl_postcon_status")
-#current status
-  postcon_status_current <- postcon_status %>%
-    group_by(system_id) %>%
-    dplyr::summarise(status_date = max(status_date)) %>%
-    ungroup %>%
-    inner_join(postcon_status, by = c("system_id"="system_id","status_date"="status_date"))
-
-
-# Most recent note of most recent stats
-  recent_notes <- postcon_status_current %>%
-    inner_join(postcon_notes, by = "postcon_status_uid") %>%
-    select(system_id, note_date, notes) %>%
-    arrange(desc(note_date)) %>%
-    group_by(system_id) %>%
-    summarise(notes = notes[1])
-  
-# Date of Most recent note of most recent stats
-  recent_notes_date <- postcon_status_current %>%
-    inner_join(postcon_notes, by = "postcon_status_uid") %>%
-    select(system_id, note_date, notes) %>%
-    arrange(desc(note_date)) %>%
-    group_by(system_id) %>%
-    summarise(note_date = note_date[1])
-
-#post-con status types
-  postcon_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup")
-  
-# join status 
-  postcon_status_dl <- postcon_status %>%
-    inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid")
+  status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup")
   
 #status list
-  status_choice <- postcon_status_lookup %>%
+  status_choice <- status_lookup %>%
     select(status) %>%
     distinct() %>%
     pull
@@ -174,6 +138,44 @@
 
     #initialzie reactive values
     rv <- reactiveValues()
+  
+    # load required tables here
+    #post-con status notes
+    rv$postcon_notes <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(note_date) as fq from fieldwork.tbl_postcon_notes"))
+    
+    #post-con status 
+    rv$postcon_status <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(status_date) as fq from fieldwork.tbl_postcon_status"))
+    
+    #current status
+    rv$postcon_status_current <- reactive(rv$postcon_status() %>%
+      group_by(system_id) %>%
+      dplyr::summarise(status_date = max(status_date)) %>%
+      ungroup %>%
+      inner_join(rv$postcon_status(), by = c("system_id"="system_id","status_date"="status_date")))
+    
+    
+    # Most recent note of most recent stats
+    rv$recent_notes <- reactive(rv$postcon_status_current() %>%
+      inner_join(rv$postcon_notes(), by = "postcon_status_uid") %>%
+      select(system_id, note_date, notes) %>%
+      arrange(desc(note_date)) %>%
+      group_by(system_id) %>%
+      summarise(notes = notes[1]))
+    
+    # Date of Most recent note of most recent stats
+    rv$recent_notes_date <- reactive(rv$postcon_status_current() %>%
+      inner_join(rv$postcon_notes(), by = "postcon_status_uid") %>%
+      select(system_id, note_date, notes) %>%
+      arrange(desc(note_date)) %>%
+      group_by(system_id) %>%
+      summarise(note_date = note_date[1]))
+    
+    #post-con status types
+    rv$postcon_status_lookup <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup"))
+    
+    # join status 
+    rv$postcon_status_dl <- reactive(rv$postcon_status() %>%
+      inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid"))
     
     #create a date style for headers
     sf <- lubridate::stamp("March 1, 1999", orders = "%B %d, %Y")
@@ -190,14 +192,14 @@
     rv$pc_status_todate <- reactive(
       if(input$status == ""){
         
-       postcon_status_current %>%
-        inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
+       rv$postcon_status_current() %>%
+        inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
         select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
         
       } else{
         
-       postcon_status_current %>%
-          inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
+       rv$postcon_status_current() %>%
+          inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
           filter(status == input$status) %>%
           select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
         
@@ -207,15 +209,15 @@
     # quarter based 
     rv$pc_status__q <- reactive( 
       if(input$status == "") {
-      postcon_status_current %>%
-        inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
+      rv$postcon_status_current() %>%
+        inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
         filter(status_date >= as.Date(rv$start_date()) & status_date <= as.Date(rv$end_date())) %>%
         select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
       
       } else {
         
-      postcon_status_current %>%
-          inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
+        rv$postcon_status_current() %>%
+          inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
           filter(status_date >= as.Date(rv$start_date()) & status_date <= as.Date(rv$end_date())) %>%
           filter(status == input$status) %>%
           select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
@@ -238,7 +240,7 @@
                 defaultPageSize = 25,
                 height = 1000, 
                 details = function(index) {
-                  nested_notes <- postcon_notes[postcon_notes$postcon_status_uid == rv$pc_status()$postcon_status_uid[index], ] %>%
+                  nested_notes <- rv$postcon_notes()[rv$postcon_notes()$postcon_status_uid == rv$pc_status()$postcon_status_uid[index], ] %>%
                     arrange(desc(note_date)) %>%
                     select(`Note Date`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
@@ -259,7 +261,7 @@
       },
       content = function(filename){
         
-        df_list <- list(postcon_status_dl)
+        df_list <- list(rv$postcon_status_dl())
         write.xlsx(x = df_list , file = filename)
       }
     )
@@ -310,8 +312,8 @@
     # current Post-con of a system
     rv$Current_sys_status <- reactive(
       
-      postcon_status_current %>%
-        inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
+      rv$postcon_status_current() %>%
+        inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
         select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid) %>%
         filter(`System ID` == input$system_id)
       
@@ -320,10 +322,10 @@
     # all post-cons of a system
     rv$all_sys_status <- reactive(
       
-      postcon_status %>%
-        inner_join(postcon_status_lookup, by = "postcon_status_lookup_uid") %>%
+      rv$postcon_status() %>%
+        inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
         select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid) %>%
-        filter(postcon_status_uid %!in% postcon_status_current$postcon_status_uid) %>%
+        filter(postcon_status_uid %!in% rv$postcon_status_current()$postcon_status_uid) %>%
         filter(`System ID` == input$system_id) %>%
         arrange(desc(`Date Assigned`))
       
@@ -344,7 +346,7 @@
                 defaultPageSize = 25,
                 height = 400, 
                 details = function(index) {
-                  nested_notes <- postcon_notes[postcon_notes$postcon_status_uid == rv$Current_sys_status()$postcon_status_uid[index], ] %>%
+                  nested_notes <- rv$postcon_notes()[rv$postcon_notes()$postcon_status_uid == rv$Current_sys_status()$postcon_status_uid[index], ] %>%
                     arrange(desc(note_date)) %>%
                     select(`Note Date`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
@@ -374,7 +376,7 @@
                 defaultPageSize = 25,
                 height = 400, 
                 details = function(index) {
-                  nested_notes <- postcon_notes[postcon_notes$postcon_status_uid == rv$all_sys_status()$postcon_status_uid[index], ] %>%
+                  nested_notes <- rv$postcon_notes()[rv$postcon_notes()$postcon_status_uid == rv$all_sys_status()$postcon_status_uid[index], ] %>%
                     arrange(desc(note_date)) %>%
                     select(`Note Date`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
@@ -509,7 +511,7 @@
       
       
       # get the uid
-      pc_uid <-  postcon_status %>%
+      pc_uid <-  rv$postcon_status() %>%
         select(postcon_status_uid) %>%
         pull %>%
         max + 1
@@ -517,23 +519,43 @@
       if(length(input$current_status_selected) == 0 & length(input$past_status_selected) == 0){
         if(input$create_status == FALSE){
           
-          new_status <- data.frame(system_id = input$system_id,
-                                   postcon_status_lookup_uid = postcon_status_lookup %>%
+          rv$new_status <- reactive(data.frame(system_id = input$system_id,
+                                   postcon_status_lookup_uid = rv$postcon_status_lookup() %>%
                                      filter(status == input$status_edit) %>%
                                      select(postcon_status_lookup_uid) %>%
                                      pull,
                                    status_date = input$date,
-                                   postcon_status_uid = pc_uid)
+                                   postcon_status_uid = pc_uid))
           
-          new_note <- data.frame(note_date = input$date,
+          rv$new_note <- reactive(data.frame(note_date = input$date,
                                  notes = input$note,
-                                 postcon_status_uid = pc_uid)
+                                 postcon_status_uid = pc_uid))
           
           
-          odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status"), new_status, append= TRUE, row.names = FALSE )
-          odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_notes"), new_note, append= TRUE, row.names = FALSE )
+          odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status"), rv$new_status(), append= TRUE, row.names = FALSE )
+          odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_notes"), rv$new_note(), append= TRUE, row.names = FALSE )
           
-
+          # rerun queries
+          #post-con status notes
+          rv$postcon_notes <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(note_date) as fq from fieldwork.tbl_postcon_notes"))
+          
+          #post-con status 
+          rv$postcon_status <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(status_date) as fq from fieldwork.tbl_postcon_status"))
+          
+          #post-con status types
+          rv$postcon_status_lookup <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup"))
+          
+          reset("status_edit")
+          reset("date")
+          reset("note")
+          reset("current_header")
+          reset("sys_current_pc_table")
+          reset("past_header")
+          reset("sys_past_pc_table")
+          reset("create_status")
+          reset("new_status")
+          
+            
           
           
           
