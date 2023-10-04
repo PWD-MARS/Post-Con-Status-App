@@ -601,6 +601,7 @@
           #post-con status types
           rv$postcon_status_lookup <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup"))
           
+          reset("postcon_table")
           reset("status_edit")
           reset("date")
           reset("note")
@@ -654,6 +655,7 @@
           #post-con status types
           rv$postcon_status_lookup <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup"))
           
+          reset("postcon_table")
           reset("status_edit")
           reset("date")
           reset("note")
