@@ -514,13 +514,30 @@
         max + 1
       
       if(length(input$current_status_selected) == 0 & length(input$past_status_selected) == 0){
-        if(input$create_status == FALSE){
+          if(input$create_status == FALSE){
+            
+            pc_status_uid <-  rv$postcon_status_lookup() %>%
+              filter(status == input$status_edit) %>%
+              select(postcon_status_lookup_uid) %>%
+              pull
+            
+          } else{
+            
+            pc_status_uid <- rv$postcon_status_lookup() %>%
+              select(postcon_status_lookup_uid) %>%
+              pull %>%
+              max() + 1
+            
+            odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status_lookup"), data.frame(status = input$new_status, postcon_status_lookup_uid = pc_status_uid), append= TRUE, row.names = FALSE )
+           
+            
+          }
+            
+            
+            
           
           rv$new_status <- reactive(data.frame(system_id = input$system_id,
-                                   postcon_status_lookup_uid = rv$postcon_status_lookup() %>%
-                                     filter(status == input$status_edit) %>%
-                                     select(postcon_status_lookup_uid) %>%
-                                     pull,
+                                   postcon_status_lookup_uid = pc_status_uid,
                                    status_date = input$date,
                                    postcon_status_uid = pc_uid))
           
@@ -552,15 +569,30 @@
           reset("create_status")
           reset("new_status")
           
-        }
-      } else if(length(input$current_status_selected) != 0){
-        if(input$create_status == FALSE){
-          
-          # get the uid 
-          pc_lookup_uid_current <- rv$postcon_status_lookup() %>%
-            filter(status == input$status_edit) %>%
-            select(postcon_status_lookup_uid) %>%
+          # update drop down choices 
+          status_choice <- dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup") %>%
+            select(status) %>%
             pull
+          updateSelectInput(session, "status_edit", choices = c("", status_choice), selected = "")
+          
+        
+      } else if(length(input$current_status_selected) != 0){
+          if(input$create_status == FALSE){
+            
+            pc_status_uid_current <-  rv$postcon_status_lookup() %>%
+              filter(status == input$status_edit) %>%
+              select(postcon_status_lookup_uid) %>%
+              pull
+            
+          } else{
+            
+            pc_status_uid_current <- rv$postcon_status_lookup() %>%
+              select(postcon_status_lookup_uid) %>%
+              pull %>%
+              max() + 1
+            
+            odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status_lookup"), data.frame(status = input$new_status, postcon_status_lookup_uid = pc_status_uid_current), append= TRUE, row.names = FALSE )
+          }
           
           pc_uid_current <- rv$Current_sys_status()$postcon_status_uid[input$current_status_selected]
           
@@ -574,7 +606,7 @@
                                             
           
           edit_status_current <- paste0(
-            "Update fieldwork.tbl_postcon_status SET system_id ='", input$system_id,"', postcon_status_lookup_uid = ", pc_lookup_uid_current,
+            "Update fieldwork.tbl_postcon_status SET system_id ='", input$system_id,"', postcon_status_lookup_uid = ", pc_status_uid_current,
             ", status_date ='", input$date,"' where postcon_status_uid = ", pc_uid_current)
             
           edit_note_current <- paste0("Update fieldwork.tbl_postcon_notes SET notes ='", input$note,"', postcon_status_uid = ", pc_uid_current,
@@ -605,16 +637,37 @@
           reset("create_status")
           reset("new_status")
           
-        
-        }
-      } else{
-        if(input$create_status == FALSE){
           
-          # get the uid 
-          pc_lookup_uid_past <- rv$postcon_status_lookup() %>%
-            filter(status == input$status_edit) %>%
-            select(postcon_status_lookup_uid) %>%
+          # update drop down choices 
+          status_choice <- dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup") %>%
+            select(status) %>%
             pull
+          updateSelectInput(session, "status_edit", choices = c("", status_choice), selected = "")
+          
+        
+        
+      } else{
+
+          if(input$create_status == FALSE){
+            
+            pc_status_uid_past <-  rv$postcon_status_lookup() %>%
+              filter(status == input$status_edit) %>%
+              select(postcon_status_lookup_uid) %>%
+              pull
+            
+          } else{
+            
+            pc_status_uid_past <- rv$postcon_status_lookup() %>%
+              select(postcon_status_lookup_uid) %>%
+              pull %>%
+              max() + 1
+            
+            odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status_lookup"), data.frame(status = input$new_status, postcon_status_lookup_uid = pc_status_uid_past), append= TRUE, row.names = FALSE )
+            
+            
+          }
+          
+          
           
           pc_uid_past <- rv$all_sys_status()$postcon_status_uid[input$past_status_selected]
           
@@ -628,7 +681,7 @@
             
           
           edit_status_past <- paste0(
-            "Update fieldwork.tbl_postcon_status SET system_id ='", input$system_id,"', postcon_status_lookup_uid = ", pc_lookup_uid_past,
+            "Update fieldwork.tbl_postcon_status SET system_id ='", input$system_id,"', postcon_status_lookup_uid = ", pc_status_uid_past,
             ", status_date ='", input$date,"' where postcon_status_uid = ", pc_uid_past)
           
           edit_note_past <- paste0("Update fieldwork.tbl_postcon_notes SET notes ='", input$note,"', postcon_status_uid = ", pc_uid_past,
@@ -659,7 +712,12 @@
           reset("create_status")
           reset("new_status")
           
-        }
+          
+          # update drop down choices 
+          status_choice <- dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup") %>%
+            select(status) %>%
+            pull
+          updateSelectInput(session, "status_edit", choices = c("", status_choice), selected = "")
         
       }
     }
