@@ -157,7 +157,7 @@
     # Most recent note of most recent stats
     rv$recent_notes <- reactive(rv$postcon_status_current() %>%
       inner_join(rv$postcon_notes(), by = "postcon_status_uid") %>%
-      select(system_id, note_date, notes) %>%
+      select(system_id, note_date, notes, postcon_notes_uid) %>%
       arrange(desc(note_date)) %>%
       group_by(system_id) %>%
       summarise(notes = notes[1]))
@@ -165,7 +165,7 @@
     # Date of Most recent note of most recent stats
     rv$recent_notes_date <- reactive(rv$postcon_status_current() %>%
       inner_join(rv$postcon_notes(), by = "postcon_status_uid") %>%
-      select(system_id, note_date, notes) %>%
+      select(system_id, note_date, notes, postcon_notes_uid) %>%
       arrange(desc(note_date)) %>%
       group_by(system_id) %>%
       summarise(note_date = note_date[1]))
@@ -565,22 +565,114 @@
           
           # get the uid 
           pc_lookup_uid_current <- rv$postcon_status_lookup() %>%
-            filter(status == rv$Current_sys_status()$`Post Construction Status`[input$current_status_selected]) %>%
+            filter(status == input$status_edit) %>%
             select(postcon_status_lookup_uid) %>%
             pull
           
           pc_uid_current <- rv$Current_sys_status()$postcon_status_uid[input$current_status_selected]
           
+          pc_notes_uid_current <- rv$postcon_status_current() %>%
+                                             inner_join(rv$postcon_notes(), by = "postcon_status_uid") %>%
+                                             select(note_date, postcon_notes_uid) %>%
+                                             arrange(desc(note_date)) %>%
+                                             select(postcon_notes_uid) %>%
+                                             pull %>%
+                                             .[1]
+                                            
+          
           edit_status_current <- paste0(
             "Update fieldwork.tbl_postcon_status SET system_id ='", input$system_id,"', postcon_status_lookup_uid = ", pc_lookup_uid_current,
             ", status_date ='", input$date,"' where postcon_status_uid = ", pc_uid_current)
             
-            
+          edit_note_current <- paste0("Update fieldwork.tbl_postcon_notes SET notes ='", input$note,"', postcon_status_uid = ", pc_uid_current,
+                                         ", note_date ='", input$date,"' where postcon_notes_uid = ", pc_notes_uid_current)  
           
-          cat(edit_status_current)
+          
+          odbc::dbGetQuery(poolConn, edit_status_current)
+          odbc::dbGetQuery(poolConn, edit_note_current)
+          
+          # rerun queries
+          #post-con status notes
+          rv$postcon_notes <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(note_date) as fq from fieldwork.tbl_postcon_notes"))
+          
+          #post-con status 
+          rv$postcon_status <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(status_date) as fq from fieldwork.tbl_postcon_status"))
+          
+          #post-con status types
+          rv$postcon_status_lookup <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup"))
+          
+          reset("status_edit")
+          reset("date")
+          reset("note")
+          reset("current_header")
+          reset("sys_current_pc_table")
+          reset("past_header")
+          reset("sys_past_pc_table")
+          reset("create_status")
+          reset("new_status")
           
         
         }
+      } else{
+        if(input$create_status == FALSE){
+          
+          # get the uid 
+          pc_lookup_uid_past <- rv$postcon_status_lookup() %>%
+            filter(status == input$status_edit) %>%
+            select(postcon_status_lookup_uid) %>%
+            pull
+          
+          pc_uid_past <- rv$all_sys_status()$postcon_status_uid[input$past_status_selected]
+          
+          pc_notes_uid_past <- rv$postcon_notes() %>%
+            filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
+            arrange((desc(note_date))) %>%
+            select(postcon_notes_uid) %>%
+            pull %>%
+            .[1]
+            
+            
+          
+          edit_status_past <- paste0(
+            "Update fieldwork.tbl_postcon_status SET system_id ='", input$system_id,"', postcon_status_lookup_uid = ", pc_lookup_uid_past,
+            ", status_date ='", input$date,"' where postcon_status_uid = ", pc_uid_past)
+          
+          edit_note_past <- paste0("Update fieldwork.tbl_postcon_notes SET notes ='", input$note,"', postcon_status_uid = ", pc_uid_past,
+                                      ", note_date ='", input$date,"' where postcon_notes_uid = ", pc_notes_uid_past)  
+          
+          
+          odbc::dbGetQuery(poolConn, edit_status_past)
+          odbc::dbGetQuery(poolConn, edit_note_past)
+          
+          # rerun queries
+          #post-con status notes
+          rv$postcon_notes <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(note_date) as fq from fieldwork.tbl_postcon_notes"))
+          
+          #post-con status 
+          rv$postcon_status <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(status_date) as fq from fieldwork.tbl_postcon_status"))
+          
+          #post-con status types
+          rv$postcon_status_lookup <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup"))
+          
+          reset("status_edit")
+          reset("date")
+          reset("note")
+          reset("current_header")
+          reset("sys_current_pc_table")
+          reset("past_header")
+          reset("sys_past_pc_table")
+          reset("create_status")
+          reset("new_status")
+          
+          
+        }
+        
+        
+        
+        
+        
+        
+        
       }
     }
     )
