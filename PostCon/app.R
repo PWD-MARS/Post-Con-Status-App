@@ -560,6 +560,27 @@
           
           
         }
+      } else if(length(input$current_status_selected) != 0){
+        if(input$create_status == FALSE){
+          
+          # get the uid 
+          pc_lookup_uid_current <- rv$postcon_status_lookup() %>%
+            filter(status == rv$Current_sys_status()$`Post Construction Status`[input$current_status_selected]) %>%
+            select(postcon_status_lookup_uid) %>%
+            pull
+          
+          pc_uid_current <- rv$Current_sys_status()$postcon_status_uid[input$current_status_selected]
+          
+          edit_status_current <- paste0(
+            "Update fieldwork.tbl_postcon_status SET system_id ='", input$system_id,"', postcon_status_lookup_uid = ", pc_lookup_uid_current,
+            ", status_date ='", input$date,"' where postcon_status_uid = ", pc_uid_current)
+            
+            
+          
+          cat(edit_status_current)
+          
+        
+        }
       }
     }
     )
