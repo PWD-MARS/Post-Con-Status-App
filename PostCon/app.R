@@ -507,9 +507,6 @@
     ### On click "save_edit"
     
     observeEvent(input$save_edit, {
-
-      
-      
       # get the uid
       pc_uid <-  rv$postcon_status() %>%
         select(postcon_status_uid) %>%
@@ -554,10 +551,6 @@
           reset("sys_past_pc_table")
           reset("create_status")
           reset("new_status")
-          
-            
-          
-          
           
         }
       } else if(length(input$current_status_selected) != 0){
@@ -666,21 +659,12 @@
           reset("create_status")
           reset("new_status")
           
-          
         }
-        
-        
-        
-        
-        
-        
         
       }
     }
     )
       
-
-
   }
   
   # Complete app with UI and server components
