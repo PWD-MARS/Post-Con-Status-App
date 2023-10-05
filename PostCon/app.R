@@ -809,6 +809,10 @@
           updateSelectInput(session, "status_edit", choices = c("", status_choice), selected = "")
         
       }
+      
+      updateReactable("sys_current_pc_table", selected = NA)
+      updateReactable("sys_past_pc_table", selected = NA)
+      
     }
     )
     
