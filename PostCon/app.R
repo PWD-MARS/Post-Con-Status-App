@@ -95,10 +95,15 @@
                                                                                choices = c("Q1" = "9/30", "Q2" = "12/31","Q3" = "3/31", "Q4" = "6/30"))))
                                 ), 
                                 selectInput("status", "Post Construction Status", choices = c("", status_choice) , selected = ""),
+                                strong(""),
+                                strong("Breakdown of Current Status"),
+                                reactableOutput("summary_table"),
+                              
+                                
                                 #1.3 DL Button --------
                                 downloadButton("download_table", "Download")
                               ),
-                              
+          
                               mainPanel(
                                 strong(span(textOutput("table_name"), style = "font-size:22px")),
                                 reactableOutput("postcon_table")
@@ -175,7 +180,9 @@
     
     # join status 
     rv$postcon_status_dl <- reactive(rv$postcon_status() %>%
-      inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid"))
+      inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
+      inner_join(rv$postcon_notes(), by = "postcon_status_uid") %>%
+        select(system_id, status_date, notes))
     
     #create a date style for headers
     sf <- lubridate::stamp("March 1, 1999", orders = "%B %d, %Y")
@@ -721,6 +728,36 @@
         
       }
     }
+    )
+    
+    
+### Summary page
+    
+    rv$summary <- reactive({
+      
+      status_break <- rv$postcon_status_current() %>%
+                             inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
+                             select(system_id, Status = status) %>%
+                             group_by(Status) %>%
+                             summarise(Count = n()) %>%
+                             arrange(Count)
+      
+      
+      total_row <- data.frame(Status = "Total", Count = sum(status_break$Count))
+      return(bind_rows(status_break, total_row))
+                                
+      })
+    
+    output$summary_table <- renderReactable(
+      
+      reactable(rv$summary(), 
+                searchable = FALSE,
+                pagination = FALSE,
+                sortable = FALSE,
+                striped = TRUE,
+                filterable = FALSE, 
+                fullWidth = TRUE) 
+
     )
       
   }
