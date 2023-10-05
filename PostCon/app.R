@@ -74,6 +74,16 @@
   start_fy <- 2012
   years <- start_fy:current_fy %>% sort(decreasing = TRUE)
   
+  # #replace special characters with friendlier characters
+  # special_char_replace <- function(note){
+  #   
+  #   note_fix <- note %>% 
+  #     str_replace_all(c("•" = "-", "ï‚§" = "-", "“" = '"', '”' = '"'))
+  #   
+  #   return(note_fix)
+  #   
+  # }
+  
   # Define UI
   ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID",
                    #1.1 Unmonitored Active SMPs -------
@@ -101,6 +111,9 @@
                               
                                 
                                 #1.3 DL Button --------
+  
+                                fluidRow(column(12, strong("Download all Post-Con Status and Notes"))),
+                          
                                 downloadButton("download_table", "Download")
                               ),
           
@@ -429,13 +442,22 @@
     
     #when a row any of the tables in add/edit is clicked
     observeEvent(input$current_status_selected, {
+      
+      if(rv$recent_notes_date() %>% filter(system_id == input$system_id) %>% nrow() > 0 ) {
+        
+      updated_date <- rv$recent_notes_date() %>%
+          filter(system_id == input$system_id) %>%
+          select(note_date) %>%
+          pull
+      } else {
+        
+      updated_date <- rv$Current_sys_status()$`Date Assigned`[input$current_status_selected]
+      }
+        
       #deselect from other tables
       updateReactable("sys_past_pc_table", selected = NA)
       selected_status(rv$Current_sys_status()$`Post Construction Status`[input$current_status_selected])
-      selected_date(rv$recent_notes_date() %>%
-                      filter(system_id == input$system_id) %>%
-                      select(note_date) %>%
-                      pull)
+      selected_date(updated_date)
       selected_note(rv$recent_notes() %>%
                       filter(system_id == input$system_id) %>%
                       select(notes) %>%
@@ -455,15 +477,25 @@
       #deselect from other tables
       updateReactable("sys_current_pc_table", selected = NA)
       
+      if(rv$postcon_notes() %>% filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>% nrow() > 0 ) {
+        
+        updated_date <- rv$postcon_notes() %>%
+          filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
+          arrange((desc(note_date))) %>%
+          select(note_date) %>%
+          pull %>%
+          .[1]
+      } else {
+        
+        updated_date <- rv$all_sys_status()$`Date Assigned`[input$past_status_selected]
+      }
+      
+      
+      
       # selected_system_id(rv$all_sys_status()$`System ID`[input$past_status_selected])
       selected_status(rv$all_sys_status()$`Post Construction Status`[input$past_status_selected])
       # selected_date(rv$all_sys_status()$`Date Assigned`[input$past_status_selected])
-      selected_date(rv$postcon_notes() %>%
-                      filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
-                      arrange((desc(note_date))) %>%
-                      select(note_date) %>%
-                      pull %>%
-                      .[1])
+      selected_date(updated_date)
       selected_note(rv$postcon_notes() %>%
                       filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
                       arrange((desc(note_date))) %>%
@@ -514,6 +546,13 @@
     ### On click "save_edit"
     
     observeEvent(input$save_edit, {
+      
+      #process text field to prevent sql injection
+      # rv$reason_step <- reactive(gsub('\'', '\'\'', input$note))
+      # rv$reason_step_two <- reactive(special_char_replace(rv$reason_step()))
+      # rv$input_note <- reactive(if(nchar(rv$reason_step_two()) == 0) "NULL" else paste0("'", rv$reason_step_two(), "'"))
+      
+      
       # get the uid
       pc_uid <-  rv$postcon_status() %>%
         select(postcon_status_uid) %>%
@@ -521,6 +560,7 @@
         max + 1
       
       if(length(input$current_status_selected) == 0 & length(input$past_status_selected) == 0){
+
           if(input$create_status == FALSE){
             
             pc_status_uid <-  rv$postcon_status_lookup() %>%
@@ -549,12 +589,15 @@
                                    postcon_status_uid = pc_uid))
           
           rv$new_note <- reactive(data.frame(note_date = input$date,
-                                 notes = input$note,
+                                 notes =  input$note,
                                  postcon_status_uid = pc_uid))
           
           
           odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status"), rv$new_status(), append= TRUE, row.names = FALSE )
+          
+          if(input$note !=""){
           odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_notes"), rv$new_note(), append= TRUE, row.names = FALSE )
+          }
           
           # rerun queries
           #post-con status notes
@@ -584,6 +627,7 @@
           
         
       } else if(length(input$current_status_selected) != 0){
+        # look for the status-if you want to create a new status, you have to write it in db first
           if(input$create_status == FALSE){
             
             pc_status_uid_current <-  rv$postcon_status_lookup() %>%
@@ -604,6 +648,7 @@
           pc_uid_current <- rv$Current_sys_status()$postcon_status_uid[input$current_status_selected]
           
           pc_notes_uid_current <- rv$postcon_status_current() %>%
+                                             filter(system_id == input$system_id) %>%
                                              inner_join(rv$postcon_notes(), by = "postcon_status_uid") %>%
                                              select(note_date, postcon_notes_uid) %>%
                                              arrange(desc(note_date)) %>%
@@ -621,7 +666,25 @@
           
           
           odbc::dbGetQuery(poolConn, edit_status_current)
+          
+          if(!is.na(pc_notes_uid_current)){
+            
+          if(input$note !=""){
           odbc::dbGetQuery(poolConn, edit_note_current)
+            cat(edit_note_current)
+          } else {
+            
+            edit_note_current <- paste0("DELETE FROM fieldwork.tbl_postcon_notes where postcon_notes_uid = ", pc_notes_uid_current)  
+            odbc::dbGetQuery(poolConn, edit_note_current)
+            
+          }
+          } else {
+            
+            new_note_current <- paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", input$date,"','", input$note,"',", pc_uid_current,")")  
+            odbc::dbGetQuery(poolConn, new_note_current)
+            cat(new_note_current)
+
+          }
           
           # rerun queries
           #post-con status notes
@@ -691,12 +754,31 @@
             "Update fieldwork.tbl_postcon_status SET system_id ='", input$system_id,"', postcon_status_lookup_uid = ", pc_status_uid_past,
             ", status_date ='", input$date,"' where postcon_status_uid = ", pc_uid_past)
           
-          edit_note_past <- paste0("Update fieldwork.tbl_postcon_notes SET notes ='", input$note,"', postcon_status_uid = ", pc_uid_past,
+          edit_note_past <- paste0("Update fieldwork.tbl_postcon_notes SET notes ='", input$note ,"', postcon_status_uid = ", pc_uid_past,
                                       ", note_date ='", input$date,"' where postcon_notes_uid = ", pc_notes_uid_past)  
           
           
           odbc::dbGetQuery(poolConn, edit_status_past)
-          odbc::dbGetQuery(poolConn, edit_note_past)
+          
+          if(!is.na(pc_notes_uid_past)){
+          if(input$note !=""){
+            odbc::dbGetQuery(poolConn, edit_note_past)
+            cat(edit_note_past)
+            
+          } else {
+            
+            edit_note_past <- paste0("DELETE FROM fieldwork.tbl_postcon_notes where postcon_notes_uid = ", pc_notes_uid_past)  
+            odbc::dbGetQuery(poolConn, edit_note_past)
+            
+          }
+          } else{
+            
+            new_note_past <- paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", input$date,"','", input$note,"',", pc_uid_past,")")  
+            odbc::dbGetQuery(poolConn, new_note_past)
+            cat(new_note_past)
+            
+            
+          }
           
           # rerun queries
           #post-con status notes
