@@ -85,7 +85,7 @@
   # }
   
   # Define UI
-  ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID",
+  ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID", theme = shinytheme("cerulean"),
                    #1.1 Unmonitored Active SMPs -------
                    tabPanel("Post-Construction Status Table", value = "status", 
                             titlePanel("Current Post-Construction Status Table"),
@@ -195,7 +195,7 @@
     rv$postcon_status_dl <- reactive(rv$postcon_status() %>%
       inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
       inner_join(rv$postcon_notes(), by = "postcon_status_uid") %>%
-        select(system_id, status_date, notes))
+        select(system_id, status_date, status, note_date, notes))
     
     #create a date style for headers
     sf <- lubridate::stamp("March 1, 1999", orders = "%B %d, %Y")
