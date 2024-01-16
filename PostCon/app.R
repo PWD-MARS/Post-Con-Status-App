@@ -61,8 +61,11 @@
   system_id_all <- odbc::dbGetQuery(poolConn, paste0("select distinct system_id from external.mat_assets where system_id like '%-%'")) %>% 
     dplyr::arrange(system_id) %>%  
     dplyr::pull()
+  
   # those with post-con status
-  system_id_postcon <- odbc::dbGetQuery(poolConn, paste0("select distinct system_id from fieldwork.tbl_postcon_status")) %>% 
+  systems_pc <- odbc::dbGetQuery(poolConn, paste0("select * from fieldwork.tbl_postcon_status")) 
+  system_id_postcon <- systems_pc %>% 
+    select(system_id) %>%
     dplyr::arrange(system_id) %>%  
     dplyr::pull()
   
@@ -147,7 +150,31 @@
                                         h4(textOutput("past_header")), 
                                         reactableOutput("sys_past_pc_table"))
                      )
-                   ))
+                   )),
+                   tabPanel("Quarterly QA", value = "qa", 
+                            titlePanel("Quarterly QA of Monitoring Activities and Record Keeping"),
+                            sidebarLayout(
+                              sidebarPanel(
+                              fluidRow(column(6,
+                                              selectInput("fy", "Fiscal Year", choices = years)),
+                                       column(6,
+                                              selectInput("quarter", "Fiscal Quarter", 
+                                                            choices = c("Q1", "Q2", "Q3", "Q4"))))
+
+                           
+                            ),
+                            mainPanel(
+                              h2(textOutput("qa_table_name")),
+                              h3("SRT QA"),
+                              reactableOutput("srt_qa_table"),
+                              h3("CWL QA"),
+                              reactableOutput("cwl_qa_table"),
+                              h3("Post-Con QA"),
+                              reactableOutput("postcon_qa_table")
+                              
+                            ))
+                            
+                   )
   )
   )
   
@@ -204,8 +231,29 @@
     rv$start_date <- reactive(lubridate::mdy(paste0(input$start_quarter, "/", ifelse(input$start_quarter == "7/1" | input$start_quarter == "10/1", as.numeric(input$start_fy)-1,input$start_fy))))
     rv$end_date <- reactive(lubridate::mdy(paste0(input$end_quarter, "/", ifelse(input$end_quarter == "9/30" | input$end_quarter == "12/31", as.numeric(input$end_fy)-1,input$end_fy))))
 
+
     output$table_name <- renderText(ifelse(input$date_range == "To-Date", paste("Current Post-Con Status to Date:", input$status), paste("Current Post-Con Status", " Assigned between ", rv$start_date(), " and ", rv$end_date(),": ",input$status, sep = "")))
     
+    
+    #Date range for QA tab
+    #get quarters as dates
+    rv$qa_start_quarter <- reactive(case_when(input$quarter == "Q3" ~ "1/1", 
+                                           input$quarter == "Q4" ~ "4/1", 
+                                           input$quarter == "Q1" ~ "7/1", 
+                                           input$quarter == "Q2" ~ "10/1"))
+    
+    rv$qa_end_quarter <- reactive(case_when(input$quarter == "Q3" ~ "3/31", 
+                                         input$quarter == "Q4" ~ "6/30", 
+                                         input$quarter == "Q1" ~ "9/30", 
+                                         input$quarter == "Q2" ~ "12/31"))
+
+    #convert FY/Quarter to a real date for QA tab
+    rv$qa_start_date <- reactive(lubridate::mdy(paste0(rv$qa_start_quarter(), "/", ifelse(input$quarter == "Q1" | input$quarter == "Q2", as.numeric(input$fy)-1,input$fy))))
+    rv$qa_end_date <- reactive(lubridate::mdy(paste0(rv$qa_end_quarter(), "/", ifelse(input$quarter == "Q1" | input$quarter == "Q2", as.numeric(input$fy)-1,input$fy))))
+    
+    output$qa_table_name <- renderText(paste("Flagged SMPs for ","Fiscal Quarter", input$quarter, "of" , input$fy,"-", rv$qa_start_date(), " to ",  rv$qa_end_date()))
+    
+  
 ### First tab: Post-Construction Status Table
     
     # todate 
@@ -845,6 +893,72 @@
                 fullWidth = TRUE) 
 
     )
+    
+    
+    
+    
+    ### QA TAB
+    # postcon
+    systems_pc <- odbc::dbGetQuery(poolConn, paste0("select * from fieldwork.tbl_postcon_status")) 
+    
+    # srt
+    rv$srt_Q <- reactive(paste0("SELECT * FROM fieldwork.tbl_srt WHERE test_date >= ", "'", rv$qa_start_date(), "'", " AND test_date <= '", rv$qa_end_date(),"'" , "AND system_id like '%-%'", sep = ""))
+    rv$srt <- reactive(dbGetQuery(poolConn,  rv$srt_Q()))
+    
+    # deployments
+    deployment_all <- dbGetQuery(poolConn, "SELECT *, admin.fun_smp_to_system(smp_id) as system_id FROM fieldwork.viw_deployment_full where type = 'LEVEL' AND smp_id like '%-%-%'")
+    
+    
+    
+    ### SRT QA
+    rv$srt_qa <- reactive(deployment_all %>%
+                            filter(deployment_dtime_est <= rv$qa_end_date() & deployment_dtime_est > rv$qa_start_date()) %>%                   
+                            filter(term == "SRT") %>%
+                            full_join(rv$srt(), by = c("deployment_dtime_est" = "test_date", "system_id")) %>%
+                            filter(is.na(srt_uid) | is.na(deployment_uid) ) %>%
+                            select(`System ID` = system_id, `Deployment ID` = deployment_uid, ` SRT ID` = srt_uid, `Deployment/SRT Date` = deployment_dtime_est))
+    
+    ### CWL QA
+    rv$cwl_qa <- reactive(deployment_all %>%
+                            filter(deployment_dtime_est <= rv$qa_end_date() & deployment_dtime_est > rv$qa_start_date()) %>%                   
+                            filter(term != "SRT") %>%
+                            left_join(systems_pc, by = "system_id") %>%
+                            filter(is.na(postcon_status_uid)) %>%
+                            select(`System ID` = system_id, `SMP ID` = smp_id, `Deployment Date` = deployment_dtime_est, `Post-Con Status ID`= postcon_status_uid) %>%
+                            distinct())
+    
+    
+    #### Postcon QA
+    rv$postcon_qa <- reactive(systems_pc %>%
+                                 filter(status_date <= rv$qa_end_date() & status_date > rv$qa_start_date()) %>%
+                                 left_join(deployment_all, by = "system_id") %>%
+                                 filter(is.na(deployment_uid)) %>%
+                                 select(`System ID`= system_id, `Post-Con Status ID` = postcon_status_uid, `Deployment ID` = deployment_uid))
+    
+    
+    
+    # SRT
+    output$srt_qa_table <- renderReactable(
+
+      reactable(rv$srt_qa())
+
+    )
+    
+    #CWL
+    output$cwl_qa_table <- renderReactable(
+      
+      reactable(rv$cwl_qa())
+      
+    )
+    
+    #Postcon QA
+    output$postcon_qa_table <- renderReactable(
+      
+      reactable(rv$postcon_qa())
+      
+    )
+    
+    
       
   }
   
