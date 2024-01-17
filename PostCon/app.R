@@ -168,10 +168,12 @@
                               h2(textOutput("qa_table_name")),
                               h3("Missing SRT or SRT Deployment Record"),
                               reactableOutput("srt_qa_table"),
-                              h3("Missing Post-Con Status for Systems with SRT or SRT Deployment Record"),
+                              h3("Missing Post-Con Status for Systems with Post-Con SRT"),
                               reactableOutput("srt_nopostcon_table"),
                               h3("Missing Post-Con Status for Systems with CWL Deployment Record"),
                               reactableOutput("cwl_qa_table"),
+                              h3("Missing Post-Con Status for Systems with CWL Data in the Database"),
+                              reactableOutput("cwl_data_qa_table"),
                               h3("Missing Deployment Records for Systems with Updated Post-Con Status/Notes this Quarter"),
                               reactableOutput("postcon_qa_table"),
                               
@@ -905,13 +907,28 @@
     systems_pc <- odbc::dbGetQuery(poolConn, paste0("select * from fieldwork.tbl_postcon_status")) 
     
     # srt
+    rv$srt_postcon <- reactive(dbGetQuery(poolConn,  paste0("SELECT * FROM fieldwork.tbl_srt where system_id like '%-%' and con_phase_lookup_uid = 2 and test_date < '", rv$qa_end_date(), "'", sep = "")))
     rv$srt_Q <- reactive(paste0("SELECT * FROM fieldwork.tbl_srt WHERE test_date >= ", "'", rv$qa_start_date(), "'", " AND test_date <= '", rv$qa_end_date(),"'" , "AND system_id like '%-%'", sep = ""))
     rv$srt <- reactive(dbGetQuery(poolConn,  rv$srt_Q()))
     
     # deployments
     deployment_all <- dbGetQuery(poolConn, "SELECT *, admin.fun_smp_to_system(smp_id) as system_id FROM fieldwork.viw_deployment_full where type = 'LEVEL' AND smp_id like '%-%-%'")
     
-    
+    # CWL data
+    cwl_data_list <- dbGetQuery(poolConn, "WITH cte_smp_id_ow AS (
+                                                SELECT DISTINCT admin.fun_smp_to_system(smp_id) as system_id, ow_suffix, ow_uid
+                                                FROM fieldwork.tbl_ow
+                                                ),
+                                                cte_CWL_uid AS (
+                                                SELECT DISTINCT ow_uid
+                                                FROM data.tbl_ow_leveldata_raw
+                                                )
+                                                SELECT DISTINCT system_id
+                                                FROM cte_CWL_uid AS l
+                                                INNER JOIN cte_smp_id_ow AS r
+                                                ON l.ow_uid = r.ow_uid
+                                                WHERE system_id like '%-%'
+                                                ")
     
     ### SRT QA
     rv$srt_qa <- reactive(deployment_all %>%
@@ -925,15 +942,26 @@
     
     
     ### SRT but no Post-Con
-    rv$srt_nopostcon <- reactive(deployment_all %>%
-                            filter(deployment_dtime_est <= rv$qa_end_date() & deployment_dtime_est > rv$qa_start_date()) %>%                   
-                            filter(term == "SRT") %>%
-                            full_join(rv$srt(), by = c("deployment_dtime_est" = "test_date", "system_id")) %>%
-                            left_join(systems_pc, by = "system_id") %>%
-                            filter(is.na(postcon_status_uid)) %>%
-                            mutate(`SRT Quarter` = paste(input$fy, input$quarter, sep = "")) %>%
-                            select(`System ID` = system_id, `SRT Quarter`, `Post-Con Status ID`= postcon_status_uid) %>%
-                            distinct())
+    # rv$srt_nopostcon <- reactive(deployment_all %>%
+    #                         filter(deployment_dtime_est <= rv$qa_end_date() & deployment_dtime_est > rv$qa_start_date()) %>%                   
+    #                         filter(term == "SRT") %>%
+    #                         full_join(rv$srt(), by = c("deployment_dtime_est" = "test_date", "system_id")) %>%
+    #                         left_join(systems_pc, by = "system_id") %>%
+    #                         filter(is.na(postcon_status_uid)) %>%
+    #                         mutate(`SRT Quarter` = paste(input$fy, input$quarter, sep = "")) %>%
+    #                         select(`System ID` = system_id, `SRT Quarter`, `Post-Con Status ID`= postcon_status_uid) %>%
+    #                         distinct())
+    # 
+    
+    rv$srt_nopostcon <- reactive(rv$srt_postcon() %>%
+                                   left_join(systems_pc, by = "system_id") %>%
+                                   filter(is.na(postcon_status_uid)) %>%
+                                   mutate(`SRT Quarter` = paste(input$fy, input$quarter, sep = "")) %>%
+                                   select(`System ID` = system_id, `SRT Quarter`, `Post-Con Status ID`= postcon_status_uid) %>%
+                                   distinct()
+    )
+    
+    
     
     
     
@@ -946,6 +974,16 @@
                             mutate(`Deployment Quarter` = paste(input$fy, input$quarter, sep = "")) %>%
                             select(`System ID` = system_id, `Deployment Quarter`, `Post-Con Status ID`= postcon_status_uid) %>%
                             distinct())
+    
+    #### CWL Data QA
+    rv$cwl_data_qa <- reactive(cwl_data_list %>%
+                                 left_join(systems_pc, by = "system_id") %>%
+                                 filter(is.na(postcon_status_uid)) %>%
+                                 select(`System ID` = system_id, `Post-Con Status ID`= postcon_status_uid) %>%
+                                 distinct())
+                                 
+      
+    
     
     
     #### Postcon QA
@@ -976,6 +1014,13 @@
     output$cwl_qa_table <- renderReactable(
       
       reactable(rv$cwl_qa())
+      
+    )
+    
+    #CWL Data
+    output$cwl_data_qa_table <- renderReactable(
+      
+      reactable(rv$cwl_data_qa())
       
     )
     
