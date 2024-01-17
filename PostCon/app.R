@@ -88,7 +88,7 @@
   # }
   
   # Define UI
-  ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID", theme = shinytheme("cerulean"),
+  ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID", #theme = shinytheme("cerulean"),
                    #1.1 Unmonitored Active SMPs -------
                    tabPanel("Post-Construction Status Table", value = "status", 
                             titlePanel("Current Post-Construction Status Table"),
@@ -165,12 +165,14 @@
                             ),
                             mainPanel(
                               h2(textOutput("qa_table_name")),
-                              h3("SRT QA"),
+                              h3("Missing SRT or SRT Deployment Record"),
                               reactableOutput("srt_qa_table"),
-                              h3("CWL QA"),
+                              h3("Missing Post-Con Status for Systems with SRT Record"),
+                              reactableOutput("srt_nopostcon_table"),
+                              h3("Missing Post-Con Status for Systems with CWL Deployment"),
                               reactableOutput("cwl_qa_table"),
-                              h3("Post-Con QA"),
-                              reactableOutput("postcon_qa_table")
+                              h3("Missing Deployments for Systems with Updated Post-Con Status/Notes this Quarter"),
+                              reactableOutput("postcon_qa_table"),
                               
                             ))
                             
@@ -915,8 +917,24 @@
                             filter(deployment_dtime_est <= rv$qa_end_date() & deployment_dtime_est > rv$qa_start_date()) %>%                   
                             filter(term == "SRT") %>%
                             full_join(rv$srt(), by = c("deployment_dtime_est" = "test_date", "system_id")) %>%
-                            filter(is.na(srt_uid) | is.na(deployment_uid) ) %>%
-                            select(`System ID` = system_id, `Deployment ID` = deployment_uid, ` SRT ID` = srt_uid, `Deployment/SRT Date` = deployment_dtime_est))
+                            filter(is.na(srt_uid) | is.na(deployment_uid)) %>%
+                            distinct() %>%
+                            select(`System ID` = system_id, `SMP ID` = smp_id, `Deployment ID` = deployment_uid, ` SRT ID` = srt_uid, `Deployment/SRT Date` = deployment_dtime_est))
+    
+    
+    
+    ### SRT but no Post-Con
+    rv$srt_nopostcon <- reactive(deployment_all %>%
+                            filter(deployment_dtime_est <= rv$qa_end_date() & deployment_dtime_est > rv$qa_start_date()) %>%                   
+                            filter(term == "SRT") %>%
+                            full_join(rv$srt(), by = c("deployment_dtime_est" = "test_date", "system_id")) %>%
+                            left_join(systems_pc, by = "system_id") %>%
+                            filter(is.na(postcon_status_uid)) %>%
+                            mutate(`SRT Quarter` = paste(input$fy, input$quarter, sep = "")) %>%
+                            select(`System ID` = system_id, `SRT Quarter`, `Post-Con Status ID`= postcon_status_uid) %>%
+                            distinct())
+    
+    
     
     ### CWL QA
     rv$cwl_qa <- reactive(deployment_all %>%
@@ -924,7 +942,8 @@
                             filter(term != "SRT") %>%
                             left_join(systems_pc, by = "system_id") %>%
                             filter(is.na(postcon_status_uid)) %>%
-                            select(`System ID` = system_id, `SMP ID` = smp_id, `Deployment Date` = deployment_dtime_est, `Post-Con Status ID`= postcon_status_uid) %>%
+                            mutate(`Deployment Quarter` = paste(input$fy, input$quarter, sep = "")) %>%
+                            select(`System ID` = system_id, `Deployment Quarter`, `Post-Con Status ID`= postcon_status_uid) %>%
                             distinct())
     
     
@@ -942,6 +961,14 @@
 
       reactable(rv$srt_qa())
 
+    )
+    
+    
+    # SRT no postcon
+    output$srt_nopostcon_table <- renderReactable(
+      
+      reactable(rv$srt_nopostcon())
+      
     )
     
     #CWL
