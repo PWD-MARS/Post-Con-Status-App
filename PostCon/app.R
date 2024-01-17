@@ -253,7 +253,7 @@
     rv$qa_start_date <- reactive(lubridate::mdy(paste0(rv$qa_start_quarter(), "/", ifelse(input$quarter == "Q1" | input$quarter == "Q2", as.numeric(input$fy)-1,input$fy))))
     rv$qa_end_date <- reactive(lubridate::mdy(paste0(rv$qa_end_quarter(), "/", ifelse(input$quarter == "Q1" | input$quarter == "Q2", as.numeric(input$fy)-1,input$fy))))
     
-    output$qa_table_name <- renderText(paste("Flagged SMPs for ","Fiscal Quarter", input$quarter, "of" , input$fy,"-", rv$qa_start_date(), " to ",  rv$qa_end_date()))
+    output$qa_table_name <- renderText(paste("Flagged SMPs for ","Fiscal Quarter", input$quarter, "of" , input$fy,"(", rv$qa_start_date(), " to ",  rv$qa_end_date(),")"))
     
   
 ### First tab: Post-Construction Status Table
