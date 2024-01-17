@@ -88,7 +88,7 @@
   # }
   
   # Define UI
-  ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID", #theme = shinytheme("cerulean"),
+  ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID", theme = shinytheme("cerulean"),
                    #1.1 Unmonitored Active SMPs -------
                    tabPanel("Post-Construction Status Table", value = "status", 
                             titlePanel("Current Post-Construction Status Table"),
@@ -167,11 +167,11 @@
                               h2(textOutput("qa_table_name")),
                               h3("Missing SRT or SRT Deployment Record"),
                               reactableOutput("srt_qa_table"),
-                              h3("Missing Post-Con Status for Systems with SRT Record"),
+                              h3("Missing Post-Con Status for Systems with SRT or SRT Deployment Record"),
                               reactableOutput("srt_nopostcon_table"),
-                              h3("Missing Post-Con Status for Systems with CWL Deployment"),
+                              h3("Missing Post-Con Status for Systems with CWL Deployment Record"),
                               reactableOutput("cwl_qa_table"),
-                              h3("Missing Deployments for Systems with Updated Post-Con Status/Notes this Quarter"),
+                              h3("Missing Deployment Records for Systems with Updated Post-Con Status/Notes this Quarter"),
                               reactableOutput("postcon_qa_table"),
                               
                             ))
