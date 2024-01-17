@@ -132,11 +132,12 @@
                      
                      sidebarPanel(
                        selectInput("system_id", "System ID", choices = c("", system_id_all) , selected = ""),
-                       conditionalPanel(condition = "input.create_status === false", selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = "")),
-                       checkboxInput("create_status","Create New Post-Con Status?", 
-                                     value = FALSE),
-                       conditionalPanel(condition = "input.create_status === true", 
-                                        textAreaInput("new_status", "New Post Construction Status:", height = '50px')),                       
+                       # conditionalPanel(condition = "input.create_status === false", selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = "")),
+                       # checkboxInput("create_status","Create New Post-Con Status?", 
+                       #               value = FALSE),
+                       # conditionalPanel(condition = "input.create_status === true", 
+                       #                  textAreaInput("new_status", "New Post Construction Status:", height = '50px')),   
+                       selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = ""),
                        dateInput("date",label = "Date",value = NULL),
                        textAreaInput("note", "Post-Construction Note:", height = '85px'),
                        disabled(actionButton("save_edit", "Save The Post-Con Status/Notes")),
