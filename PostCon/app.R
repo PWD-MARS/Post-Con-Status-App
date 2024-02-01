@@ -132,12 +132,12 @@
                      
                      sidebarPanel(
                        selectInput("system_id", "System ID", choices = c("", system_id_all) , selected = ""),
-                       # conditionalPanel(condition = "input.create_status === false", selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = "")),
-                       # checkboxInput("create_status","Create New Post-Con Status?", 
-                       #               value = FALSE),
-                       # conditionalPanel(condition = "input.create_status === true", 
-                       #                  textAreaInput("new_status", "New Post Construction Status:", height = '50px')),   
-                       selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = ""),
+                       conditionalPanel(condition = "input.create_status === false", selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = "")),
+                       checkboxInput("create_status","Create New Post-Con Status?",
+                                     value = FALSE),
+                       conditionalPanel(condition = "input.create_status === true",
+                                        textAreaInput("new_status", "New Post Construction Status:", height = '50px')),
+                       # selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = ""),
                        dateInput("date",label = "Date",value = NULL),
                        textAreaInput("note", "Post-Construction Note:", height = '85px'),
                        disabled(actionButton("save_edit", "Save The Post-Con Status/Notes")),
@@ -166,7 +166,7 @@
                             ),
                             mainPanel(
                               h2(textOutput("qa_table_name")),
-                              h3("Missing SRT or SRT Deployment Record"),
+                              h3("Missing SRT or SRT Deployment Record this Quarter"),
                               reactableOutput("srt_qa_table"),
                               h3("Missing Post-Con Status for Systems with Post-Con SRT"),
                               reactableOutput("srt_nopostcon_table"),
@@ -174,6 +174,8 @@
                               reactableOutput("cwl_qa_table"),
                               h3("Missing Post-Con Status for Systems with CWL Data in the Database"),
                               reactableOutput("cwl_data_qa_table"),
+                              h3("Missing CWL Data in Database for Systems with Sensors Collected"),
+                              reactableOutput("collected_no_cwl"),
                               h3("Missing Deployment Records for Systems with Updated Post-Con Status/Notes this Quarter"),
                               reactableOutput("postcon_qa_table"),
                               
@@ -982,6 +984,14 @@
                                  select(`System ID` = system_id, `Post-Con Status ID`= postcon_status_uid) %>%
                                  distinct())
                                  
+    
+    rv$collected_no_cwl <- reactive(deployment_all %>%
+                                      filter(collection_dtime_est <= rv$qa_end_date() & collection_dtime_est > rv$qa_start_date()) %>%                   
+                                      filter(term != "SRT") %>%
+                                      filter(system_id %!in% cwl_data_list$system_id) %>%
+                                      select(`System ID`= system_id, `Sensor Collection Date` = collection_dtime_est) %>%
+                                      distinct())
+                                     
       
     
     
@@ -1021,6 +1031,13 @@
     output$cwl_data_qa_table <- renderReactable(
       
       reactable(rv$cwl_data_qa())
+      
+    )
+    
+    #Collected sensor but no CWL data in Db
+    output$collected_no_cwl <- renderReactable(
+      
+      reactable(rv$collected_no_cwl())
       
     )
     
