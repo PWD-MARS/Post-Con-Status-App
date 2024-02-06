@@ -792,8 +792,6 @@
             
           }
           
-          
-          
           pc_uid_past <- rv$all_sys_status()$postcon_status_uid[input$past_status_selected]
           
           pc_notes_uid_past <- rv$postcon_notes() %>%
@@ -901,9 +899,6 @@
 
     )
     
-    
-    
-    
     ### QA TAB
     # postcon
     systems_pc <- odbc::dbGetQuery(poolConn, paste0("select * from fieldwork.tbl_postcon_status")) 
@@ -940,21 +935,8 @@
                             filter(is.na(srt_uid) | is.na(deployment_uid)) %>%
                             distinct() %>%
                             select(`System ID` = system_id, `SMP ID` = smp_id, `Deployment ID` = deployment_uid, ` SRT ID` = srt_uid, `Deployment/SRT Date` = deployment_dtime_est))
-    
-    
-    
-    ### SRT but no Post-Con
-    # rv$srt_nopostcon <- reactive(deployment_all %>%
-    #                         filter(deployment_dtime_est <= rv$qa_end_date() & deployment_dtime_est > rv$qa_start_date()) %>%                   
-    #                         filter(term == "SRT") %>%
-    #                         full_join(rv$srt(), by = c("deployment_dtime_est" = "test_date", "system_id")) %>%
-    #                         left_join(systems_pc, by = "system_id") %>%
-    #                         filter(is.na(postcon_status_uid)) %>%
-    #                         mutate(`SRT Quarter` = paste(input$fy, input$quarter, sep = "")) %>%
-    #                         select(`System ID` = system_id, `SRT Quarter`, `Post-Con Status ID`= postcon_status_uid) %>%
-    #                         distinct())
-    # 
-    
+
+
     rv$srt_nopostcon <- reactive(rv$srt_postcon() %>%
                                    left_join(systems_pc, by = "system_id") %>%
                                    filter(is.na(postcon_status_uid)) %>%
@@ -962,10 +944,6 @@
                                    select(`System ID` = system_id, `SRT Quarter`, `Post-Con Status ID`= postcon_status_uid) %>%
                                    distinct()
     )
-    
-    
-    
-    
     
     ### CWL QA
     rv$cwl_qa <- reactive(deployment_all %>%
@@ -992,64 +970,43 @@
                                       select(`System ID`= system_id, `Sensor Collection Date` = collection_dtime_est) %>%
                                       distinct())
                                      
-      
-    
-    
-    
     #### Postcon QA
     rv$postcon_qa <- reactive(systems_pc %>%
                                  filter(status_date <= rv$qa_end_date() & status_date > rv$qa_start_date()) %>%
                                  left_join(deployment_all, by = "system_id") %>%
                                  filter(is.na(deployment_uid)) %>%
                                  select(`System ID`= system_id, `Post-Con Status ID` = postcon_status_uid, `Deployment ID` = deployment_uid))
-    
-    
-    
+  
     # SRT
     output$srt_qa_table <- renderReactable(
-
       reactable(rv$srt_qa())
-
     )
-    
     
     # SRT no postcon
     output$srt_nopostcon_table <- renderReactable(
-      
       reactable(rv$srt_nopostcon())
-      
     )
     
     #CWL
     output$cwl_qa_table <- renderReactable(
-      
       reactable(rv$cwl_qa())
-      
     )
     
     #CWL Data
     output$cwl_data_qa_table <- renderReactable(
-      
       reactable(rv$cwl_data_qa())
-      
     )
     
     #Collected sensor but no CWL data in Db
     output$collected_no_cwl <- renderReactable(
-      
       reactable(rv$collected_no_cwl())
-      
     )
     
     #Postcon QA
     output$postcon_qa_table <- renderReactable(
-      
       reactable(rv$postcon_qa())
-      
     )
     
-    
-      
   }
   
   # Complete app with UI and server components
