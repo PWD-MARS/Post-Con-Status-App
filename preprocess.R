@@ -17,10 +17,11 @@ library(DT)
 #reactable for reactable tables
 library(reactable)
 library(readxl)
+library(DBI)
 #Not in logical
 `%!in%` <- Negate(`%in%`)
 
-poolConn <- dbPool(odbc(), dsn = "mars14_data", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
 
 # Parse dates
 
@@ -61,15 +62,19 @@ df_db_final <- df_db_final %>%
   
 tbl_postcon_status <- df_db_final %>%
   arrange(desc(status_date)) %>%
-  group_by(system_id) %>%
-  summarise(status_date = status_date[1], postcon_status_lookup_uid = max(postcon_status_lookup_uid)) %>%
-  mutate(postcon_status_uid = 1:456)
+  group_by(system_id, postcon_status_lookup_uid) %>%
+  summarise(status_date = status_date[1], postcon_status_lookup_uid = max(postcon_status_lookup_uid))
 
+tbl_postcon_status['postcon_status_uid'] <- 1:469
 
 tbl_postcon_notes <- df_db_final %>%
-  select(system_id, note_date = status_date, notes) %>%
-  inner_join(tbl_postcon_status, by = "system_id") %>%
+  select(system_id, note_date = status_date, notes, postcon_status_lookup_uid) %>%
+  inner_join(tbl_postcon_status, by = c("system_id","postcon_status_lookup_uid")) %>%
   select(note_date, notes, postcon_status_uid)
+
+tbl_postcon_status <- tbl_postcon_status %>%
+  replace_na(list(status_date = as.Date("2012-01-01")))
+
   
 
 
