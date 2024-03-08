@@ -47,7 +47,11 @@
 
 #js warning about leaving page
   jscode <- 'window.onbeforeunload = function() { return "Please use the button on the webpage"; };'
-
+  
+  # fiscal quarter lookup
+  fq_lookup <- dbGetQuery(poolConn,"select * from admin.tbl_fiscal_quarter_lookup")
+  
+  # post-con status look up
   status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup")
   
 #status list
@@ -71,6 +75,10 @@
   
 # Fiscal uarters 
   fq <- dbGetQuery(poolConn, "SELECT * FROM admin.tbl_fiscal_quarter_lookup")
+  
+  q_list <- fq %>%
+    select(fiscal_quarter) %>%
+    pull
   
 # get the current fiscal year and list of all years from start of data (2012) to now
   current_fy <- lubridate::today() %m+% months(6) %>% year()
@@ -98,14 +106,8 @@
                                 #selectInput("system_id_pc", "System ID", choices = system_id_postcon, selected = NULL),
                                 selectInput("date_range", "Date Range", choices = c("To-Date", "Select Range")),
                                 conditionalPanel(condition = "input.date_range == 'Select Range'", 
-                                                 fluidRow(column(6,
-                                                                 selectInput("start_fy", "Start Fiscal Year (FY)", choices = years)),
-                                                          column(6,selectInput("start_quarter", "Start Fiscal Quarter", 
-                                                                               choices = c("Q1" = "7/1", "Q2" = "10/1","Q3" = "1/1", "Q4" = "4/1")))),
-                                                 fluidRow(column(6,
-                                                                 selectInput("end_fy", "End Fiscal Year (FY)", choices = years)),
-                                                          column(6,selectInput("end_quarter", "End Fiscal Quarter", 
-                                                                               choices = c("Q1" = "9/30", "Q2" = "12/31","Q3" = "3/31", "Q4" = "6/30"))))
+                                                 fluidRow(column(12,
+                                                                 selectInput("f_q", "Fiscal Quarter", choices = q_list, selected = "FY24Q2")))
                                 ), 
                                 selectInput("status", "Post Construction Status", choices = c("", status_choice) , selected = ""),
                                 strong(""),
@@ -137,8 +139,8 @@
                                      value = FALSE),
                        conditionalPanel(condition = "input.create_status === true",
                                         textAreaInput("new_status", "New Post Construction Status:", height = '50px')),
-                       # selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = ""),
-                       dateInput("date",label = "Date",value = NULL),
+                       selectInput("quarter_assigned", "Quarter", choices = c("", q_list) , selected = ""),
+                       #dateInput("date",label = "Date",value = NULL),
                        textAreaInput("note", "Post-Construction Note:", height = '85px'),
                        disabled(actionButton("save_edit", "Save The Post-Con Status/Notes")),
                        actionButton("clear_pcs", "Clear All Fields")
@@ -193,10 +195,13 @@
   
     # load required tables here
     #post-con status notes
-    rv$postcon_notes <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(note_date) as fq from fieldwork.tbl_postcon_notes"))
+    rv$postcon_notes <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_notes"))
     
     #post-con status 
-    rv$postcon_status <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(status_date) as fq from fieldwork.tbl_postcon_status"))
+    rv$postcon_status <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status") %>%
+                                    inner_join(fq_lookup, by = "fiscal_quarter_lookup_uid") %>%
+                                    select(system_id, postcon_status_lookup_uid, status_date, postcon_status_uid, fiscal_quarter_lookup_uid,  fq = fiscal_quarter))
+      
     
     #current status
     rv$postcon_status_current <- reactive(rv$postcon_status() %>%
@@ -239,7 +244,7 @@
     rv$end_date <- reactive(lubridate::mdy(paste0(input$end_quarter, "/", ifelse(input$end_quarter == "9/30" | input$end_quarter == "12/31", as.numeric(input$end_fy)-1,input$end_fy))))
 
 
-    output$table_name <- renderText(ifelse(input$date_range == "To-Date", paste("Current Post-Con Status to Date:", input$status), paste("Current Post-Con Status", " Assigned between ", rv$start_date(), " and ", rv$end_date(),": ",input$status, sep = "")))
+    output$table_name <- renderText(ifelse(input$date_range == "To-Date", paste("Current Post-Con Status to Date:", input$status), paste("Current Post-Con Status", " Belonging to ", input$f_q,";", input$status, sep = "")))
     
     
     #Date range for QA tab
@@ -286,14 +291,14 @@
       if(input$status == "") {
       rv$postcon_status_current() %>%
         inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
-        filter(status_date >= as.Date(rv$start_date()) & status_date <= as.Date(rv$end_date())) %>%
+        filter(fq == input$f_q) %>%
         select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
       
       } else {
         
         rv$postcon_status_current() %>%
           inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
-          filter(status_date >= as.Date(rv$start_date()) & status_date <= as.Date(rv$end_date())) %>%
+          filter(fq == input$f_q)  %>%
           filter(status == input$status) %>%
           select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
         
@@ -347,6 +352,7 @@
     selected_status <- reactiveVal(NULL)
     selected_date <- reactiveVal(NULL)
     selected_note <- reactiveVal(NULL)
+    selected_q <- reactiveVal(NULL)
   
     observeEvent(input$status_selected, {
       if (!is.null(input$status_selected)) {
@@ -469,16 +475,13 @@
     # when a system id is selected 
     observeEvent(input$system_id, {
 
-      # reset("status_edit")
-      # reset("date")
-      # reset("note")
-      
-   
       updateSelectInput(session, "status_edit", selected = "")
-      updateSelectInput(session, "date", selected = Sys.Date())
       updateTextAreaInput(session, "note", value = "")
+      updateTextAreaInput(session, "quarter_assigned", value = "")
       reset("create_status")
       reset("new_status")
+
+      
         
     })
     
@@ -491,7 +494,7 @@
     
     # system_id, data, and post_con status field can't remain blank
     observe(toggleState(id = "save_edit", (input$system_id != "" 
-                                           & length(input$date) > 0
+                                           & input$quarter_assigned != ""
                                            & (input$status_edit != "" |(input$create_status == TRUE & input$new_status !="" )))))
     
     
@@ -517,10 +520,12 @@
                       filter(system_id == input$system_id) %>%
                       select(notes) %>%
                       pull) 
+      # selected quarter
+      selected_q(rv$Current_sys_status()$`Quarter`[input$current_status_selected])
       
       updateSelectInput(session, "status_edit", selected = selected_status())
       updateTextAreaInput(session, "note", value = selected_note())
-      updateSelectInput(session, "date", selected = selected_date())
+      updateSelectInput(session, "quarter_assigned", selected = selected_q())
       reset("create_status")
       reset("new_status")      
 
@@ -558,10 +563,14 @@
                       pull %>%
                       .[1])
       
+      
+      # selected quarter
+      selected_q(rv$all_sys_status()$`Quarter`[input$past_status_selected])
+      
       # updateSelectInput(session, "system_id", selected = selected_system_id())
       updateSelectInput(session, "status_edit", selected = selected_status())
       updateTextAreaInput(session, "note", value = selected_note())
-      updateSelectInput(session, "date", selected = selected_date())
+      updateSelectInput(session, "quarter_assigned", selected = selected_q())
       reset("create_status")
       reset("new_status")      
       
@@ -587,6 +596,8 @@
       reset("sys_past_pc_table")
       reset("create_status")
       reset("new_status")
+      reset("quarter_assigned")
+      
       removeModal()
     })
     
@@ -630,42 +641,59 @@
               pull %>%
               max() + 1
             
-            odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status_lookup"), data.frame(status = input$new_status, postcon_status_lookup_uid = pc_status_uid), append= TRUE, row.names = FALSE )
+            odbc::dbWriteTable(poolConn, Id(schema = "fieldwork", table = "tbl_postcon_status_lookup"), data.frame(status = input$new_status, postcon_status_lookup_uid = pc_status_uid), append= TRUE, row.names = FALSE )
            
             
           }
             
             
-            
+          rv$fiscal_quarter_uid <- reactive(fq_lookup %>%
+              filter(fiscal_quarter == input$quarter_assigned) %>%
+              select(fiscal_quarter_lookup_uid) %>%
+              pull)
           
           rv$new_status <- reactive(data.frame(system_id = input$system_id,
                                    postcon_status_lookup_uid = pc_status_uid,
-                                   status_date = input$date,
-                                   postcon_status_uid = pc_uid))
+                                   status_date = Sys.Date(),
+                                   postcon_status_uid = pc_uid,
+                                   fiscal_quarter_lookup_uid = rv$fiscal_quarter_uid()))
           
-          rv$new_note <- reactive(data.frame(note_date = input$date,
+          rv$new_note <- reactive(data.frame(note_date = Sys.Date(),
                                  notes =  input$note,
                                  postcon_status_uid = pc_uid))
           
           
-          odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status"), rv$new_status(), append= TRUE, row.names = FALSE )
+          #odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status"), rv$new_status(), append= TRUE, row.names = FALSE )
+          #rv$new_status_q <- reactive(paste0("INSERT INTO fieldwork.tbl_postcon_status (system_id, postcon_status_lookup_uid, status_date, fiscal_quarter_lookup_uid) VALUES ('", input$system_id, "',", pc_status_uid,",'",Sys.Date(), "',", rv$fiscal_quarter_uid(),")")) 
+          
+          rv$new_status_q <- reactive(paste0("INSERT INTO fieldwork.tbl_postcon_status (system_id, postcon_status_lookup_uid, status_date, postcon_status_uid, fiscal_quarter_lookup_uid) VALUES ('", input$system_id, "',", pc_status_uid,",'",Sys.Date(), "',", pc_uid, ",", rv$fiscal_quarter_uid(),")")) 
+          odbc::dbGetQuery(poolConn, rv$new_status_q())
+   
           
           if(input$note !=""){
-          odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_notes"), rv$new_note(), append= TRUE, row.names = FALSE )
+          #odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_notes"), rv$new_note(), append= TRUE, row.names = FALSE )
+          rv$new_note_q <- reactive(paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", Sys.Date(), "','", input$note, "',", pc_uid,")")) 
+          odbc::dbGetQuery(poolConn, rv$new_note_q())  
+            
           }
           
           # rerun queries
           #post-con status notes
-          rv$postcon_notes <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(note_date) as fq from fieldwork.tbl_postcon_notes"))
+          rv$postcon_notes <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_notes"))
           
           #post-con status 
-          rv$postcon_status <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(status_date) as fq from fieldwork.tbl_postcon_status"))
+          rv$postcon_status <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status") %>%
+                                          inner_join(fq_lookup, by = "fiscal_quarter_lookup_uid") %>%
+                                          select(system_id, postcon_status_lookup_uid, status_date, postcon_status_uid, fiscal_quarter_lookup_uid,  fq = fiscal_quarter))
+          
+          
+          
           
           #post-con status types
           rv$postcon_status_lookup <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup"))
           
           reset("status_edit")
-          reset("date")
+          reset("quarter_assigned")
           reset("note")
           reset("current_header")
           reset("sys_current_pc_table")
@@ -697,7 +725,7 @@
               pull %>%
               max() + 1
             
-            odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status_lookup"), data.frame(status = input$new_status, postcon_status_lookup_uid = pc_status_uid_current), append= TRUE, row.names = FALSE )
+            odbc::dbWriteTable(poolConn, Id(schema = "fieldwork", table = "tbl_postcon_status_lookup"), data.frame(status = input$new_status, postcon_status_lookup_uid = pc_status_uid_current), append= TRUE, row.names = FALSE )
           }
           
           pc_uid_current <- rv$Current_sys_status()$postcon_status_uid[input$current_status_selected]
@@ -710,14 +738,20 @@
                                              select(postcon_notes_uid) %>%
                                              pull %>%
                                              .[1]
+          
+          
+          rv$fiscal_quarter_uid_edit <- reactive(fq_lookup %>%
+                                              filter(fiscal_quarter == input$quarter_assigned) %>%
+                                              select(fiscal_quarter_lookup_uid) %>%
+                                              pull)
                                             
           
           edit_status_current <- paste0(
             "Update fieldwork.tbl_postcon_status SET system_id ='", input$system_id,"', postcon_status_lookup_uid = ", pc_status_uid_current,
-            ", status_date ='", input$date,"' where postcon_status_uid = ", pc_uid_current)
+            ", fiscal_quarter_lookup_uid =", rv$fiscal_quarter_uid_edit()," where postcon_status_uid = ", pc_uid_current)
             
           edit_note_current <- paste0("Update fieldwork.tbl_postcon_notes SET notes ='", input$note,"', postcon_status_uid = ", pc_uid_current,
-                                         ", note_date ='", input$date,"' where postcon_notes_uid = ", pc_notes_uid_current)  
+                                         " where postcon_notes_uid = ", pc_notes_uid_current)  
           
           
           odbc::dbGetQuery(poolConn, edit_status_current)
@@ -735,7 +769,7 @@
           }
           } else {
             
-            new_note_current <- paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", input$date,"','", input$note,"',", pc_uid_current,")")  
+            new_note_current <- paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", Sys.Date(),"','", input$note,"',", pc_uid_current,")")  
             odbc::dbGetQuery(poolConn, new_note_current)
             cat(new_note_current)
 
@@ -743,17 +777,20 @@
           
           # rerun queries
           #post-con status notes
-          rv$postcon_notes <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(note_date) as fq from fieldwork.tbl_postcon_notes"))
-          
+          rv$postcon_notes <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_notes"))
+
           #post-con status 
-          rv$postcon_status <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(status_date) as fq from fieldwork.tbl_postcon_status"))
+          rv$postcon_status <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status") %>%
+                                          inner_join(fq_lookup, by = "fiscal_quarter_lookup_uid") %>%
+                                          select(system_id, postcon_status_lookup_uid, status_date, postcon_status_uid, fiscal_quarter_lookup_uid,  fq = fiscal_quarter))
+          
           
           #post-con status types
           rv$postcon_status_lookup <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup"))
           
           reset("postcon_table")
           reset("status_edit")
-          reset("date")
+          reset("quarter_assigned")
           reset("note")
           reset("current_header")
           reset("sys_current_pc_table")
@@ -787,7 +824,7 @@
               pull %>%
               max() + 1
             
-            odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status_lookup"), data.frame(status = input$new_status, postcon_status_lookup_uid = pc_status_uid_past), append= TRUE, row.names = FALSE )
+            odbc::dbWriteTable(poolConn, Id(schema = "fieldwork", table = "tbl_postcon_status_lookup"), data.frame(status = input$new_status, postcon_status_lookup_uid = pc_status_uid_past), append= TRUE, row.names = FALSE )
             
             
           }
@@ -801,14 +838,18 @@
             pull %>%
             .[1]
             
+          rv$fiscal_quarter_uid_edit <- reactive(fq_lookup %>%
+                                                   filter(fiscal_quarter == input$quarter_assigned) %>%
+                                                   select(fiscal_quarter_lookup_uid) %>%
+                                                   pull)
             
           
           edit_status_past <- paste0(
             "Update fieldwork.tbl_postcon_status SET system_id ='", input$system_id,"', postcon_status_lookup_uid = ", pc_status_uid_past,
-            ", status_date ='", input$date,"' where postcon_status_uid = ", pc_uid_past)
+            ", fiscal_quarter_lookup_uid =", rv$fiscal_quarter_uid_edit()," where postcon_status_uid = ", pc_uid_past)
           
           edit_note_past <- paste0("Update fieldwork.tbl_postcon_notes SET notes ='", input$note ,"', postcon_status_uid = ", pc_uid_past,
-                                      ", note_date ='", input$date,"' where postcon_notes_uid = ", pc_notes_uid_past)  
+                                       " where postcon_notes_uid = ", pc_notes_uid_past)  
           
           
           odbc::dbGetQuery(poolConn, edit_status_past)
@@ -826,7 +867,7 @@
           }
           } else{
             
-            new_note_past <- paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", input$date,"','", input$note,"',", pc_uid_past,")")  
+            new_note_past <- paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", Sys.Date(),"','", input$note,"',", pc_uid_past,")")  
             odbc::dbGetQuery(poolConn, new_note_past)
             cat(new_note_past)
             
@@ -835,17 +876,20 @@
           
           # rerun queries
           #post-con status notes
-          rv$postcon_notes <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(note_date) as fq from fieldwork.tbl_postcon_notes"))
+          rv$postcon_notes <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_notes"))
           
           #post-con status 
-          rv$postcon_status <- reactive(dbGetQuery(poolConn, "select *, data.fun_date_to_fiscal_quarter(status_date) as fq from fieldwork.tbl_postcon_status"))
+          rv$postcon_status <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status") %>%
+                                          inner_join(fq_lookup, by = "fiscal_quarter_lookup_uid") %>%
+                                          select(system_id, postcon_status_lookup_uid, status_date, postcon_status_uid, fiscal_quarter_lookup_uid,  fq = fiscal_quarter))
+          
           
           #post-con status types
           rv$postcon_status_lookup <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup"))
           
           reset("postcon_table")
           reset("status_edit")
-          reset("date")
+          reset("quarter_assigned")
           reset("note")
           reset("current_header")
           reset("sys_current_pc_table")
