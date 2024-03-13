@@ -178,8 +178,12 @@
                               reactableOutput("cwl_data_qa_table"),
                               h3("Missing CWL Data in Database for Systems with Sensors Collected"),
                               reactableOutput("collected_no_cwl"),
-                              h3("Missing Deployment Records for Systems with Updated Post-Con Status/Notes this Quarter"),
-                              reactableOutput("postcon_qa_table"),
+                              #h3("Missing Deployment Records for Systems with Updated Post-Con Status/Notes this Quarter"),
+                              #reactableOutput("postcon_qa_table"),
+                              h3("Missing Post-Con Status for Systems with PPT/CET Test Record"),
+                              reactableOutput("ppt_cet_cwl_no_pc_table"),
+                              h3("Missing CWL Deployment/PPT/CET Record for Systems with Post-Con Status"),
+                              reactableOutput("pc_no_ppt_cet_cwl_table")
                               
                             ))
                             
@@ -955,6 +959,24 @@
     # deployments
     deployment_all <- dbGetQuery(poolConn, "SELECT *, admin.fun_smp_to_system(smp_id) as system_id FROM fieldwork.viw_deployment_full where type = 'LEVEL' AND smp_id like '%-%-%'")
     
+    #porous pavement test
+    ppt <- dbGetQuery(poolConn, "SELECT *, admin.fun_smp_to_system(smp_id) as system_id from fieldwork.tbl_porous_pavement where smp_id like '%-%-%'") %>%
+      select(system_id, test_date) %>%
+      mutate(test_type = "PPT") %>%
+      distinct()
+    
+    #cet
+    cet <- dbGetQuery(poolConn, "SELECT * from fieldwork.tbl_capture_efficiency where system_id like '%-%'") %>%
+      select(system_id, test_date) %>%
+      mutate(test_type = "CET") %>%
+      distinct()
+    cet$test_date <- as.Date(cet$test_date)
+    
+    
+    #union ppt and cet and apply date filter
+    cet_ppt <- cet %>%
+      union_all(ppt) 
+      
     # CWL data
     cwl_data_list <- dbGetQuery(poolConn, "WITH cte_smp_id_ow AS (
                                                 SELECT DISTINCT admin.fun_smp_to_system(smp_id) as system_id, ow_suffix, ow_uid
@@ -1020,7 +1042,20 @@
                                  left_join(deployment_all, by = "system_id") %>%
                                  filter(is.na(deployment_uid)) %>%
                                  select(`System ID`= system_id, `Post-Con Status ID` = postcon_status_uid, `Deployment ID` = deployment_uid))
+    
+    
+    
+    ### systems with post-con with no deployment record/ppt/cet
+    rv$pc_no_ppt_cet_cwl <- reactive(systems_pc %>% 
+                                      filter(system_id %!in% cet_ppt$system_id & system_id %!in% deployment_all$system_id) %>%
+                                      filter(status_date <= rv$qa_end_date() & status_date > rv$qa_start_date()))
+                                      
   
+    ### systems with deployment record/ppt/cet but no postcon
+    rv$ppt_cet_cwl_no_pc <- reactive(cet_ppt %>%
+                                       filter(system_id %!in% systems_pc$system_id) %>%
+                                       filter(test_date <= rv$qa_end_date() & test_date > rv$qa_start_date()))
+    
     # SRT
     output$srt_qa_table <- renderReactable(
       reactable(rv$srt_qa())
@@ -1046,11 +1081,23 @@
       reactable(rv$collected_no_cwl())
     )
     
-    #Postcon QA
-    output$postcon_qa_table <- renderReactable(
-      reactable(rv$postcon_qa())
+    # #Postcon QA
+    # output$postcon_qa_table <- renderReactable(
+    #   reactable(  rv$postcon_qa())
+    # )
+    # 
+    
+    # postcon no ppt/cet/cwl
+    output$pc_no_ppt_cet_cwl_table <- renderReactable(
+      reactable(rv$pc_no_ppt_cet_cwl() %>%
+                  select(`System ID` = system_id, `Status Date` = status_date))
     )
     
+    # cwl/ppt/cet this Quarter but no postcon
+    output$ppt_cet_cwl_no_pc_table <- renderReactable(
+      reactable(rv$ppt_cet_cwl_no_pc() %>%
+                  select(`System ID` = system_id, `Test Type`= test_type,`Test Date` = test_date))
+    )
   }
   
   # Complete app with UI and server components
