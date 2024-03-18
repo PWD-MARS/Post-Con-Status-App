@@ -242,15 +242,7 @@
     
     #create a date style for headers
     sf <- lubridate::stamp("March 1, 1999", orders = "%B %d, %Y")
-    
-    #convert FY/Quarter to a real date
-    rv$start_date <- reactive(lubridate::mdy(paste0(input$start_quarter, "/", ifelse(input$start_quarter == "7/1" | input$start_quarter == "10/1", as.numeric(input$start_fy)-1,input$start_fy))))
-    rv$end_date <- reactive(lubridate::mdy(paste0(input$end_quarter, "/", ifelse(input$end_quarter == "9/30" | input$end_quarter == "12/31", as.numeric(input$end_fy)-1,input$end_fy))))
 
-
-    output$table_name <- renderText(ifelse(input$date_range == "To-Date", paste("Current Post-Con Status to Date:", input$status), paste("Current Post-Con Status", " Belonging to ", input$f_q,"; ", input$status, sep = "")))
-    
-    
     #Date range for QA tab
     #get quarters as dates
     rv$qa_start_quarter <- reactive(case_when(input$quarter == "Q3" ~ "1/1", 
@@ -262,13 +254,40 @@
                                          input$quarter == "Q4" ~ "6/30", 
                                          input$quarter == "Q1" ~ "9/30", 
                                          input$quarter == "Q2" ~ "12/31"))
-
+    
+    
     #convert FY/Quarter to a real date for QA tab
     rv$qa_start_date <- reactive(lubridate::mdy(paste0(rv$qa_start_quarter(), "/", ifelse(input$quarter == "Q1" | input$quarter == "Q2", as.numeric(input$fy)-1,input$fy))))
     rv$qa_end_date <- reactive(lubridate::mdy(paste0(rv$qa_end_quarter(), "/", ifelse(input$quarter == "Q1" | input$quarter == "Q2", as.numeric(input$fy)-1,input$fy))))
     
     output$qa_table_name <- renderText(paste("Flagged SMPs for ","Fiscal Quarter", input$quarter, "of" , input$fy,"(", rv$qa_start_date(), " to ",  rv$qa_end_date(),")"))
     
+    
+    
+    
+    #get quarters as dates
+    rv$postcon_start_quarter <- reactive(case_when(str_sub(input$f_q, 5, 7) == "Q3" ~ "1/1", 
+                                                   str_sub(input$f_q, 5, 7) == "Q4" ~ "4/1", 
+                                                   str_sub(input$f_q, 5, 7) == "Q1" ~ "7/1", 
+                                                   str_sub(input$f_q, 5, 7) == "Q2" ~ "10/1"))
+    
+    rv$postcon_end_quarter <- reactive(case_when(str_sub(input$f_q, 5, 7) == "Q3" ~ "3/31", 
+                                                 str_sub(input$f_q, 5, 7) == "Q4" ~ "6/30", 
+                                                 str_sub(input$f_q, 5, 7) == "Q1" ~ "9/30", 
+                                                 str_sub(input$f_q, 5, 7) == "Q2" ~ "12/31"))
+    
+    # parse the year component from this format "FY24Q2"
+    rv$year <- reactive(str_sub(input$f_q, 3, 4))
+    
+
+    
+    #convert FY/Quarter to a real date for postcon tab
+    rv$postcon_start_date <- reactive(lubridate::mdy(paste0(rv$postcon_start_quarter(), "/", ifelse(str_sub(input$f_q, 5, 7) == "Q1" | str_sub(input$f_q, 5, 7) == "Q2", as.numeric(rv$year())-1, rv$year()))))
+    rv$postcon_end_date <- reactive(lubridate::mdy(paste0(rv$postcon_end_quarter(), "/", ifelse(str_sub(input$f_q, 5, 7) == "Q1" | str_sub(input$f_q, 5, 7) == "Q2", as.numeric(rv$year())-1, rv$year()))))
+    
+    output$table_name <- renderText(ifelse(input$date_range == "To-Date", paste("Current Post-Con Status to Date:", input$status), paste("Current Post-Con Status", " Belonging to ", input$f_q,"; ","(", rv$postcon_start_date(), " to ",  rv$postcon_end_date(),")" , "; ",input$status, sep = "")))
+    
+
   
 ### First tab: Post-Construction Status Table
     
