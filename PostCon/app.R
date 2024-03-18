@@ -105,7 +105,7 @@
                               sidebarPanel(
                                 #selectInput("system_id_pc", "System ID", choices = system_id_postcon, selected = NULL),
                                 selectInput("date_range", "Date Range", choices = c("To-Date", "Fiscal Quarter")),
-                                conditionalPanel(condition = "input.date_range == 'Select Range'", 
+                                conditionalPanel(condition = "input.date_range == 'Fiscal Quarter'", 
                                                  fluidRow(column(12,
                                                                  selectInput("f_q", "Fiscal Quarter", choices = q_list, selected = "FY24Q2")))
                                 ), 
