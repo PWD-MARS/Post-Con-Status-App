@@ -104,7 +104,7 @@
                               
                               sidebarPanel(
                                 #selectInput("system_id_pc", "System ID", choices = system_id_postcon, selected = NULL),
-                                selectInput("date_range", "Date Range", choices = c("To-Date", "Select Range")),
+                                selectInput("date_range", "Date Range", choices = c("To-Date", "Fiscal Quarter")),
                                 conditionalPanel(condition = "input.date_range == 'Select Range'", 
                                                  fluidRow(column(12,
                                                                  selectInput("f_q", "Fiscal Quarter", choices = q_list, selected = "FY24Q2")))
@@ -141,7 +141,7 @@
                                         textAreaInput("new_status", "New Post Construction Status:", height = '50px')),
                        selectInput("quarter_assigned", "Quarter", choices = c("", q_list) , selected = ""),
                        #dateInput("date",label = "Date",value = NULL),
-                       textAreaInput("note", "Post-Construction Note:", height = '85px'),
+                       textAreaInput("note", "Notes", height = '85px'),
                        disabled(actionButton("save_edit", "Save The Post-Con Status/Notes")),
                        actionButton("clear_pcs", "Clear All Fields")
                        
@@ -297,14 +297,14 @@
         
        rv$postcon_status_current() %>%
         inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
-        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
+        select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, postcon_status_uid)
         
       } else{
         
        rv$postcon_status_current() %>%
           inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
           filter(status == input$status) %>%
-          select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
+          select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, postcon_status_uid)
         
       }
     )
@@ -315,7 +315,7 @@
       rv$postcon_status_current() %>%
         inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
         filter(fq == input$f_q) %>%
-        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
+        select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, postcon_status_uid)
       
       } else {
         
@@ -323,7 +323,7 @@
           inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
           filter(fq == input$f_q)  %>%
           filter(status == input$status) %>%
-          select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid)
+          select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, postcon_status_uid)
         
       }
     )
@@ -345,11 +345,11 @@
                 details = function(index) {
                   nested_notes <- rv$postcon_notes()[rv$postcon_notes()$postcon_status_uid == rv$pc_status()$postcon_status_uid[index], ] %>%
                     arrange(desc(note_date)) %>%
-                    select(`Note Date`= note_date, Notes = notes)
+                    select(`Date of Entry`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
                                  reactable(nested_notes, columns = list(
-                                   `Note Date` = colDef(width = 100),
-                                    Notes = colDef(width = 1000)
+                                   `Date of Entry` = colDef(width = 150),
+                                    Notes = colDef(width = 950)
                                  ), outlined = TRUE)
                   )
                 }
@@ -418,7 +418,7 @@
       
       rv$postcon_status_current() %>%
         inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
-        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid) %>%
+        select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, postcon_status_uid) %>%
         filter(`System ID` == input$system_id)
       
     )
@@ -428,10 +428,10 @@
       
       rv$postcon_status() %>%
         inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
-        select(`System ID` = system_id, `Post Construction Status` = status, `Date Assigned` = status_date, Quarter = fq, postcon_status_uid) %>%
+        select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, postcon_status_uid) %>%
         filter(postcon_status_uid %!in% rv$postcon_status_current()$postcon_status_uid) %>%
         filter(`System ID` == input$system_id) %>%
-        arrange(desc(`Date Assigned`))
+        arrange(desc(`Date of Entry`))
       
     )
     
@@ -452,12 +452,12 @@
                 details = function(index) {
                   nested_notes <- rv$postcon_notes()[rv$postcon_notes()$postcon_status_uid == rv$Current_sys_status()$postcon_status_uid[index], ] %>%
                     arrange(desc(note_date)) %>%
-                    select(`Note Date`= note_date, Notes = notes)
+                    select(`Date of Entry`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
                                  reactable(nested_notes,
                                            columns = list(
-                                                          `Note Date` = colDef(width = 100),
-                                                           Notes = colDef(width = 1000)
+                                                          `Date of Entry` = colDef(width = 150),
+                                                           Notes = colDef(width = 950)
                                  ), 
                                  outlined = TRUE)
                   )
@@ -482,12 +482,12 @@
                 details = function(index) {
                   nested_notes <- rv$postcon_notes()[rv$postcon_notes()$postcon_status_uid == rv$all_sys_status()$postcon_status_uid[index], ] %>%
                     arrange(desc(note_date)) %>%
-                    select(`Note Date`= note_date, Notes = notes)
+                    select(`Date of Entry`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
                                  reactable(nested_notes, 
                                            columns = list(
-                                                     `Note Date` = colDef(width = 100),
-                                                      Notes = colDef(width = 1000)
+                                                     `Date of Entry` = colDef(width = 150),
+                                                      Notes = colDef(width = 950)
                                                        ), 
                                            outlined = TRUE)
                   )
@@ -532,7 +532,7 @@
           pull
       } else {
         
-      updated_date <- rv$Current_sys_status()$`Date Assigned`[input$current_status_selected]
+      updated_date <- rv$Current_sys_status()$`Date of Entry`[input$current_status_selected]
       }
         
       #deselect from other tables
@@ -570,14 +570,14 @@
           .[1]
       } else {
         
-        updated_date <- rv$all_sys_status()$`Date Assigned`[input$past_status_selected]
+        updated_date <- rv$all_sys_status()$`Date of Entry`[input$past_status_selected]
       }
       
       
       
       # selected_system_id(rv$all_sys_status()$`System ID`[input$past_status_selected])
       selected_status(rv$all_sys_status()$`Post Construction Status`[input$past_status_selected])
-      # selected_date(rv$all_sys_status()$`Date Assigned`[input$past_status_selected])
+      # selected_date(rv$all_sys_status()$`Date of Entry`[input$past_status_selected])
       selected_date(updated_date)
       selected_note(rv$postcon_notes() %>%
                       filter(postcon_status_uid == rv$all_sys_status()$postcon_status_uid[input$past_status_selected]) %>%
