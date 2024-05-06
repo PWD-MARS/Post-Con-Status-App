@@ -1020,6 +1020,7 @@
                             filter(term == "SRT") %>%
                             full_join(rv$srt(), by = c("deployment_dtime_est" = "test_date", "system_id")) %>%
                             filter(is.na(srt_uid) | is.na(deployment_uid)) %>%
+                            mutate(deployment_dtime_est = deployment_dtime_est %>% lubridate::ymd()) %>%
                             distinct() %>%
                             select(`System ID` = system_id, `SMP ID` = smp_id, `Deployment ID` = deployment_uid, ` SRT ID` = srt_uid, `Deployment/SRT Date` = deployment_dtime_est))
 
@@ -1054,6 +1055,7 @@
                                       filter(collection_dtime_est <= rv$qa_end_date() & collection_dtime_est > rv$qa_start_date()) %>%                   
                                       filter(term != "SRT") %>%
                                       filter(system_id %!in% cwl_data_list$system_id) %>%
+                                      mutate(collection_dtime_est = collection_dtime_est %>% lubridate::ymd()) %>%
                                       select(`System ID`= system_id, `Sensor Collection Date` = collection_dtime_est) %>%
                                       distinct())
                                      
@@ -1117,6 +1119,7 @@
     # cwl/ppt/cet this Quarter but no postcon
     output$ppt_cet_cwl_no_pc_table <- renderReactable(
       reactable(rv$ppt_cet_cwl_no_pc() %>%
+                  mutate(test_date = test_date %>% lubridate::ymd()) %>%
                   select(`System ID` = system_id, `Test Type`= test_type,`Test Date` = test_date))
     )
   }
