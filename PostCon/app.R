@@ -88,14 +88,14 @@
   years <- start_fy:current_fy %>% sort(decreasing = TRUE)
   
   # #replace special characters with friendlier characters
-  # special_char_replace <- function(note){
-  #   
-  #   note_fix <- note %>% 
-  #     str_replace_all(c("•" = "-", "ï‚§" = "-", "“" = '"', '”' = '"'))
-  #   
-  #   return(note_fix)
-  #   
-  # }
+  special_char_replace <- function(note){
+
+    note_fix <- note %>%
+      str_replace_all(c("•" = "-", "ï‚§" = "-", "“" = '"', '”' = '"'))
+
+    return(note_fix)
+
+  }
   
   # Define UI
   ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID", theme = shinytheme("cerulean"),
@@ -195,9 +195,17 @@
   
   # Server logic
   server <- function(input, output, session) {
-
+    
     #initialzie reactive values
     rv <- reactiveValues()
+    
+    #process text field to prevent sql injection
+    rv$reason_step <- reactive(gsub('\'', '\'\'',  input$note))
+    rv$input_note  <- reactive(special_char_replace(rv$reason_step()))
+    
+    
+
+  
   
     # load required tables here
     #post-con status notes
@@ -638,10 +646,6 @@
     
     observeEvent(input$save_edit, {
       
-      #process text field to prevent sql injection
-      # rv$reason_step <- reactive(gsub('\'', '\'\'', input$note))
-      # rv$reason_step_two <- reactive(special_char_replace(rv$reason_step()))
-      # rv$input_note <- reactive(if(nchar(rv$reason_step_two()) == 0) "NULL" else paste0("'", rv$reason_step_two(), "'"))
       
       
       # get the uid
@@ -684,7 +688,7 @@
                                    fiscal_quarter_lookup_uid = rv$fiscal_quarter_uid()))
           
           rv$new_note <- reactive(data.frame(note_date = Sys.Date(),
-                                 notes =  input$note,
+                                 notes =   rv$input_note(),
                                  postcon_status_uid = pc_uid))
           
           
@@ -695,9 +699,9 @@
           odbc::dbGetQuery(poolConn, rv$new_status_q())
    
           
-          if(input$note !=""){
+          if( rv$input_note() !=""){
           #odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_notes"), rv$new_note(), append= TRUE, row.names = FALSE )
-          rv$new_note_q <- reactive(paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", Sys.Date(), "','", input$note, "',", pc_uid,")")) 
+          rv$new_note_q <- reactive(paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", Sys.Date(), "','",  rv$input_note(), "',", pc_uid,")")) 
           odbc::dbGetQuery(poolConn, rv$new_note_q())  
             
           }
@@ -775,7 +779,7 @@
             "Update fieldwork.tbl_postcon_status SET system_id ='", input$system_id,"', postcon_status_lookup_uid = ", pc_status_uid_current,
             ", fiscal_quarter_lookup_uid =", rv$fiscal_quarter_uid_edit()," where postcon_status_uid = ", pc_uid_current)
             
-          edit_note_current <- paste0("Update fieldwork.tbl_postcon_notes SET notes ='", input$note,"', postcon_status_uid = ", pc_uid_current,
+          edit_note_current <- paste0("Update fieldwork.tbl_postcon_notes SET notes ='",  rv$input_note(),"', postcon_status_uid = ", pc_uid_current,
                                          " where postcon_notes_uid = ", pc_notes_uid_current)  
           
           
@@ -783,7 +787,7 @@
           
           if(!is.na(pc_notes_uid_current)){
             
-          if(input$note !=""){
+          if( rv$input_note() !=""){
           odbc::dbGetQuery(poolConn, edit_note_current)
             cat(edit_note_current)
           } else {
@@ -794,7 +798,7 @@
           }
           } else {
             
-            new_note_current <- paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", Sys.Date(),"','", input$note,"',", pc_uid_current,")")  
+            new_note_current <- paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", Sys.Date(),"','",  rv$input_note(),"',", pc_uid_current,")")  
             odbc::dbGetQuery(poolConn, new_note_current)
             cat(new_note_current)
 
@@ -873,14 +877,14 @@
             "Update fieldwork.tbl_postcon_status SET system_id ='", input$system_id,"', postcon_status_lookup_uid = ", pc_status_uid_past,
             ", fiscal_quarter_lookup_uid =", rv$fiscal_quarter_uid_edit()," where postcon_status_uid = ", pc_uid_past)
           
-          edit_note_past <- paste0("Update fieldwork.tbl_postcon_notes SET notes ='", input$note ,"', postcon_status_uid = ", pc_uid_past,
+          edit_note_past <- paste0("Update fieldwork.tbl_postcon_notes SET notes ='",  rv$input_note() ,"', postcon_status_uid = ", pc_uid_past,
                                        " where postcon_notes_uid = ", pc_notes_uid_past)  
           
           
           odbc::dbGetQuery(poolConn, edit_status_past)
           
           if(!is.na(pc_notes_uid_past)){
-          if(input$note !=""){
+          if( rv$input_note() !=""){
             odbc::dbGetQuery(poolConn, edit_note_past)
             cat(edit_note_past)
             
@@ -892,7 +896,7 @@
           }
           } else{
             
-            new_note_past <- paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", Sys.Date(),"','", input$note,"',", pc_uid_past,")")  
+            new_note_past <- paste0("INSERT INTO fieldwork.tbl_postcon_notes (note_date, notes, postcon_status_uid) VALUES ('", Sys.Date(),"','",  rv$input_note(),"',", pc_uid_past,")")  
             odbc::dbGetQuery(poolConn, new_note_past)
             cat(new_note_past)
             
