@@ -137,8 +137,8 @@
                      sidebarPanel(
                        selectInput("system_id", "System ID", choices = c("", system_id_all) , selected = ""),
                        conditionalPanel(condition = "input.create_status === false", selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = "")),
-                       checkboxInput("create_status","Create New Post-Con Status?",
-                                     value = FALSE),
+                       hidden(checkboxInput("create_status","Create New Post-Con Status?",
+                                     value = FALSE)),
                        conditionalPanel(condition = "input.create_status === true",
                                         textAreaInput("new_status", "New Post Construction Status:", height = '50px')),
                        selectInput("quarter_assigned", "Quarter", choices = c("", q_list) , selected = ""),
