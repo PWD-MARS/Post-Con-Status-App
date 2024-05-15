@@ -1026,7 +1026,7 @@
     #                                             WHERE system_id like '%-%'
     #                                             ")
     # 
-    ### SRT QA
+    ### Matching SRT deployments with SRT table records to ensure they match (full join between srt and deployment table)
     rv$srt_qa <- reactive(deployment_all %>%
                             filter(deployment_dtime_est <= rv$qa_end_date() & deployment_dtime_est > rv$qa_start_date()) %>%                   
                             filter(term == "SRT") %>%
@@ -1036,7 +1036,7 @@
                             distinct() %>%
                             select(`System ID` = system_id, `SMP ID` = smp_id, `Deployment ID` = deployment_uid, ` SRT ID` = srt_uid, `Deployment/SRT Date` = deployment_dtime_est))
 
-
+    ### left join between postcon srt table and the post-con status table to ensure all those systems with postcon SRT have post-con status
     rv$srt_nopostcon <- reactive(rv$srt_postcon() %>%
                                    left_join(systems_pc, by = "system_id") %>%
                                    filter(is.na(postcon_status_uid)) %>%
@@ -1045,17 +1045,8 @@
                                    distinct()
     )
     
-    ### CWL QA
-    rv$cwl_qa <- reactive(deployment_all %>%
-                            filter(deployment_dtime_est <= rv$qa_end_date() & deployment_dtime_est > rv$qa_start_date()) %>%                   
-                            filter(term != "SRT") %>%
-                            left_join(systems_pc, by = "system_id") %>%
-                            filter(is.na(postcon_status_uid)) %>%
-                            mutate(`Deployment Quarter` = paste(input$fy, input$quarter, sep = "")) %>%
-                            select(`System ID` = system_id, `Deployment Quarter`, `Post-Con Status ID`= postcon_status_uid) %>%
-                            distinct())
     
-    #### CWL Data QA
+    #### ALl systems with cwl data in DB must have postcon status
     rv$cwl_data_qa <- reactive(cwl_data_list %>%
                                  left_join(systems_pc, by = "system_id") %>%
                                  filter(is.na(postcon_status_uid)) %>%
@@ -1063,14 +1054,6 @@
                                  distinct())
 
                                      
-    #### Postcon QA
-    rv$postcon_qa <- reactive(systems_pc %>%
-                                 filter(status_date <= rv$qa_end_date() & status_date > rv$qa_start_date()) %>%
-                                 left_join(deployment_all, by = "system_id") %>%
-                                 filter(is.na(deployment_uid)) %>%
-                                 select(`System ID`= system_id, `Post-Con Status ID` = postcon_status_uid, `Deployment ID` = deployment_uid))
-  
-    
     # PPT during the the quarter performed, but no post-con status
     rv$ppt_no_pc <- reactive(ppt %>% 
                                filter(test_date <= rv$qa_end_date() & test_date > rv$qa_start_date()) %>%
@@ -1089,7 +1072,6 @@
                                select(`System ID` = system_id, `Test Date` = test_date) %>%
                                distinct())
                                        
-    
     
     
     # SRT
@@ -1118,8 +1100,6 @@
       reactable(rv$cet_no_pc())
     )
     
-    
-
     
 
   }
