@@ -1002,7 +1002,6 @@
     ow <- dbGetQuery(poolConn, "SELECT DISTINCT admin.fun_smp_to_system(smp_id) as system_id, ow_suffix, ow_uid
                                                 FROM fieldwork.tbl_ow WHERE smp_id like '%-%-%'")
     
-    ow_with_data <- dbGetQuery(poolConn, "SELECT DISTINCT ow_uid FROM data.mat_level_data_quarter")
     ow_with_data <- dbGetQuery(poolConn, "SELECT DISTINCT ow_uid FROM data.mat_level_data_day")
     
       
