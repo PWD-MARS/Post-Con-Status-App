@@ -1003,6 +1003,7 @@
                                                 FROM fieldwork.tbl_ow WHERE smp_id like '%-%-%'")
     
     ow_with_data <- dbGetQuery(poolConn, "SELECT DISTINCT ow_uid FROM data.mat_level_data_quarter")
+    ow_with_data <- dbGetQuery(poolConn, "SELECT DISTINCT ow_uid FROM data.mat_level_data_day")
     
       
     cwl_data_list <- ow_with_data %>%
