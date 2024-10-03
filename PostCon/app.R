@@ -99,9 +99,7 @@
   
   # Define UI
   ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID", theme = shinytheme("cyborg"),
-                   #1.1 Unmonitored Active SMPs -------
                    tabPanel("Post-Construction Status Table", value = "status", 
-                            titlePanel("Current Post-Construction Status Table"),
                             sidebarLayout(
                               
                               sidebarPanel(
@@ -131,7 +129,6 @@
                             )
                             ),
                    tabPanel("Add/Edit Post-Construction Status", value = "add_edit", 
-                   titlePanel("Add/Edit Post-Construction Status and Notes"), 
                    sidebarLayout(
                      
                      sidebarPanel(
@@ -157,7 +154,6 @@
                      )
                    )),
                    tabPanel("Quarterly QA", value = "qa", 
-                            titlePanel("Quarterly QA of Monitoring Activities and Record Keeping"),
                             sidebarLayout(
                               sidebarPanel(
                               fluidRow(column(6,
