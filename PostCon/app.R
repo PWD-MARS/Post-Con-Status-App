@@ -20,8 +20,8 @@
   library(shinyjs)
   #DT for datatables
   library(DT)
-  #reactable
-  library(reactable)
+  #reactable themes
+  library(reactablefmtr)
   #reactable for reactable tables
   library(reactable)
   #excel download
@@ -98,7 +98,7 @@
   }
   
   # Define UI
-  ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID", theme = shinytheme("cerulean"),
+  ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID", theme = shinytheme("cyborg"),
                    #1.1 Unmonitored Active SMPs -------
                    tabPanel("Post-Construction Status Table", value = "status", 
                             titlePanel("Current Post-Construction Status Table"),
@@ -169,7 +169,7 @@
                            
                             ),
                             mainPanel(
-                              h2(textOutput("qa_table_name")),
+                              h3(textOutput("qa_table_name")),
                               h3("Missing SRT or SRT Deployment Record this Quarter"),
                               reactableOutput("srt_qa_table"),
                               h3("Missing Post-Con Status for Systems with Post-Con SRT"),
@@ -337,6 +337,7 @@
 
     output$postcon_table <- renderReactable(
       reactable(rv$pc_status() %>% select(-postcon_status_uid), 
+                theme = darkly(),
                 fullWidth = TRUE,
                 selection = "single",
                 searchable = TRUE,
@@ -352,7 +353,9 @@
                     arrange(desc(note_date)) %>%
                     select(`Date of Entry`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
-                                 reactable(nested_notes, columns = list(
+                                 reactable(nested_notes, 
+                                           theme = darkly(),
+                                           columns = list(
                                    `Date of Entry` = colDef(width = 150),
                                     Notes = colDef(width = 950)
                                  ), outlined = TRUE)
@@ -444,6 +447,7 @@
     output$sys_current_pc_table <- renderReactable(
       reactable(rv$Current_sys_status()  %>%
                   select(-postcon_status_uid),
+                theme = darkly(),
                 fullWidth = TRUE,
                 selection = "single",
                 searchable = TRUE,
@@ -460,6 +464,7 @@
                     select(`Date of Entry`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
                                  reactable(nested_notes,
+                                           theme = darkly(),
                                            columns = list(
                                                           `Date of Entry` = colDef(width = 150),
                                                            Notes = colDef(width = 950)
@@ -474,6 +479,7 @@
     output$sys_past_pc_table <- renderReactable(
       reactable(rv$all_sys_status() %>% 
                   select(-postcon_status_uid),
+                theme = darkly(),
                 fullWidth = TRUE,
                 selection = "single",
                 searchable = TRUE,
@@ -490,6 +496,7 @@
                     select(`Date of Entry`= note_date, Notes = notes)
                   htmltools::div(style = "padding: 1rem",
                                  reactable(nested_notes, 
+                                           theme = darkly(),
                                            columns = list(
                                                      `Date of Entry` = colDef(width = 150),
                                                       Notes = colDef(width = 950)
@@ -958,6 +965,8 @@
     output$summary_table <- renderReactable(
       
       reactable(rv$summary(), 
+                theme = 
+                  cyborg(),
                 searchable = FALSE,
                 pagination = FALSE,
                 sortable = FALSE,
@@ -1076,28 +1085,33 @@
     
     # SRT
     output$srt_qa_table <- renderReactable(
-      reactable(rv$srt_qa())
+      reactable(rv$srt_qa(),
+                theme = darkly(),)
     )
     
     # SRT no postcon
     output$srt_nopostcon_table <- renderReactable(
-      reactable(rv$srt_nopostcon())
+      reactable(rv$srt_nopostcon(),
+                theme = darkly(),)
     )
 
     #CWL Data
     output$cwl_data_qa_table <- renderReactable(
-      reactable(rv$cwl_data_qa())
+      reactable(rv$cwl_data_qa(),
+                theme = darkly(),)
     )
     
     
     #PPT no PC
     output$ppt_no_pc <- renderReactable(
-      reactable(rv$ppt_no_pc())
+      reactable(rv$ppt_no_pc(),
+                theme = darkly(),)
     )
     
     #Stormwater Tree with CET but no PC
     output$cet_no_pc <- renderReactable(
-      reactable(rv$cet_no_pc())
+      reactable(rv$cet_no_pc(),
+                theme = darkly(),)
     )
     
     
