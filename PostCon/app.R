@@ -965,8 +965,8 @@
     output$summary_table <- renderReactable(
       
       reactable(rv$summary(), 
-                theme = 
-                  cyborg(),
+                theme = cyborg(),
+                rowStyle = list(color = "white"),
                 searchable = FALSE,
                 pagination = FALSE,
                 sortable = FALSE,
