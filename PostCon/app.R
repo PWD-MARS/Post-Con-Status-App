@@ -117,9 +117,15 @@
                                 
                                 #1.3 DL Button --------
   
-                                fluidRow(column(12, strong("Download all Post-Con Status and Notes"))),
+                                fluidRow(column(12, strong("Download all Post-Con Status Transactions and Notes"))),
                           
-                                downloadButton("download_table", "Download")
+                                downloadButton("download_table", "Download All"),
+                                
+                                fluidRow(column(12, strong("Download Latest Status"))),
+                                
+                                downloadButton("download_latest", "Download Latest Status")
+                                
+                                
                               ),
           
                               mainPanel(
@@ -241,6 +247,13 @@
       inner_join(rv$postcon_notes(), by = "postcon_status_uid") %>%
         select(system_id, status_date, status, note_date, notes))
     
+    
+    # latest status
+    rv$latest_status_dl <- reactive(rv$postcon_status_current() %>%
+                                      inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
+                                      select(system_id, status_date, fq, status))
+    
+    
     #create a date style for headers
     sf <- lubridate::stamp("March 1, 1999", orders = "%B %d, %Y")
 
@@ -360,7 +373,8 @@
                 
       ))
     
-    #download button
+    #download buttons
+    # all notes and status transactions
     output$download_table <- downloadHandler(
       
       filename = function() {
@@ -372,6 +386,24 @@
         write.xlsx(x = df_list , file = filename)
       }
     )
+    
+    # Only recent status 
+    output$download_latest <- downloadHandler(
+      
+      filename = function() {
+        paste("Latest_Status_Table", "_", Sys.Date(), ".xlsx", sep = "")
+      },
+      content = function(filename){
+        
+        df_list <- list(rv$latest_status_dl())
+        write.xlsx(x = df_list , file = filename)
+      }
+    )
+    
+    
+    
+    
+    
 ### Second tab: ADD/EDIT Post-Construction Status 
     
     # Create a reactiveVal to store the selected system_id
