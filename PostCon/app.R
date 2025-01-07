@@ -59,6 +59,20 @@
     select(status) %>%
     distinct() %>%
     pull
+  
+# users 
+  users_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_users_lookup")
+  users_lookup_list <- users_lookup %>%
+    select(postcon_users) %>%
+    pull
+# review status
+  review_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_review_status_lookup")
+  review_status_list <- review_status_lookup %>%
+    select(review_status)%>%
+    pull
+  
+  
+  
 
 #system ids
   # comprehensive list
@@ -110,6 +124,8 @@
                                                                  selectInput("f_q", "Fiscal Quarter", choices = q_list, selected = "FY24Q2")))
                                 ), 
                                 selectInput("status", "Post Construction Status", choices = c("", status_choice) , selected = ""),
+                                selectInput("review_status", "Review Status", choices = c("", review_status_list) , selected = ""),
+                                selectInput("user", "Last Modified/Reviewed By", choices = c("", users_lookup_list) , selected = ""),
                                 strong(""),
                                 strong("Breakdown of Current Status"),
                                 reactableOutput("summary_table"),
@@ -142,12 +158,14 @@
                        conditionalPanel(condition = "input.create_status === false", selectInput("status_edit", "Post Construction Status", choices = c("", status_choice) , selected = "")),
                        hidden(checkboxInput("create_status","Create New Post-Con Status?",
                                      value = FALSE)),
+                       selectInput("edit_review_status", "Review Status", choices = c("", review_status_list) , selected = ""),
+                       selectInput("edit_user", "Last Modified/Reviewed By", choices = c("", users_lookup_list) , selected = ""),
                        conditionalPanel(condition = "input.create_status === true",
                                         textAreaInput("new_status", "New Post Construction Status:", height = '50px')),
                        selectInput("quarter_assigned", "Quarter", choices = c("", q_list) , selected = ""),
                        #dateInput("date",label = "Date",value = NULL),
                        textAreaInput("note", "Notes", height = '85px'),
-                       disabled(actionButton("save_edit", "Save The Post-Con Status/Notes")),
+                       disabled(actionButton("save_edit", "Save Changes")),
                        actionButton("clear_pcs", "Clear All Fields")
                        
                      ),
@@ -253,6 +271,15 @@
                                       inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
                                       select(system_id, status_date, fq, status))
     
+    # users 
+    rv$last_user <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_users") %>%
+                               inner_join(users_lookup, by = "postcon_users_uid"))
+    
+    # review status
+    rv$review_status <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_review_status") %>%
+                                   inner_join(review_status_lookup, by = "review_status_uid"))
+    
+    
     
     #create a date style for headers
     sf <- lubridate::stamp("March 1, 1999", orders = "%B %d, %Y")
@@ -305,73 +332,160 @@
   
 ### First tab: Post-Construction Status Table
     
+    rv$review_status_filter <- reactive(
+      if(input$review_status == "") {
+        c(review_status_list, NA)
+      } else{
+        input$review_status
+      }
+    )
+    
+    rv$user_filter <- reactive(
+      if(input$user == "") {
+        c(users_lookup_list, NA)
+      } else{
+        input$user
+      }
+    )
+    
+    
     # todate 
     rv$pc_status_todate <- reactive(
       if(input$status == ""){
         
        rv$postcon_status_current() %>%
         inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
-        select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, postcon_status_uid)
-        
+          left_join(rv$last_user(), by = "postcon_status_uid" ) %>%
+          left_join(rv$review_status(), by = "postcon_status_uid") %>%
+          filter(postcon_users %in% rv$user_filter()) %>%
+          filter(review_status %in% rv$review_status_filter()) %>%
+          select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, `Last Modified/Reviewed` = postcon_users, `Review Status` = review_status, postcon_status_uid) 
+
       } else{
         
        rv$postcon_status_current() %>%
           inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
+          left_join(rv$last_user(), by = "postcon_status_uid" ) %>%
+          left_join(rv$review_status(), by = "postcon_status_uid") %>%
           filter(status == input$status) %>%
-          select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, postcon_status_uid)
-        
+          filter(postcon_users %in% rv$user_filter()) %>%
+          filter(review_status %in% rv$review_status_filter()) %>%
+          select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, `Last Modified/Reviewed` = postcon_users, `Review Status` = review_status, postcon_status_uid)
+          
       }
     )
     
     # quarter based 
     rv$pc_status__q <- reactive( 
       if(input$status == "") {
-      rv$postcon_status_current() %>%
-        inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
-        filter(fq == input$f_q) %>%
-        select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, postcon_status_uid)
-      
+        rv$postcon_status_current() %>%
+          inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
+          left_join(rv$last_user(), by = "postcon_status_uid" ) %>%
+          left_join(rv$review_status(), by = "postcon_status_uid") %>%  
+          filter(fq == input$f_q) %>%
+          filter(postcon_users %in% rv$user_filter()) %>%
+          filter(review_status %in% rv$review_status_filter()) %>%  
+          select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, `Last Modified/Reviewed` = postcon_users, `Review Status` = review_status, postcon_status_uid)
+          
       } else {
         
         rv$postcon_status_current() %>%
           inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
+          left_join(rv$last_user(), by = "postcon_status_uid" ) %>%
+          left_join(rv$review_status(), by = "postcon_status_uid") %>%
           filter(fq == input$f_q)  %>%
           filter(status == input$status) %>%
-          select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, postcon_status_uid)
+          filter(postcon_users %in% rv$user_filter()) %>%
+          filter(review_status %in% rv$review_status_filter()) %>%
+          select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, `Last Modified/Reviewed` = postcon_users, `Review Status` = review_status, postcon_status_uid)
         
       }
     )
     
     rv$pc_status <- reactive(ifelse(input$date_range == "To-Date", return(rv$pc_status_todate()), return(rv$pc_status__q())))
 
+    # output$postcon_table <- renderReactable(
+    #   reactable(rv$pc_status() %>% select(-postcon_status_uid), 
+    #             theme = darkly(),
+    #             fullWidth = TRUE,
+    #             selection = "single",
+    #             searchable = TRUE,
+    #             onClick = "select",
+    #             selectionId = "status_selected",
+    #             #searchable = TRUE,
+    #             showPageSizeOptions = TRUE,
+    #             pageSizeOptions = c(25, 50, 100),
+    #             defaultPageSize = 25,
+    #             height = 1000,
+    #             details = function(index) {
+    #               nested_notes <- rv$postcon_notes()[rv$postcon_notes()$postcon_status_uid == rv$pc_status()$postcon_status_uid[index], ] %>%
+    #                 arrange(desc(note_date)) %>%
+    #                 select(`Date of Entry`= note_date, Notes = notes)
+    #               htmltools::div(style = "padding: 1rem",
+    #                              reactable(nested_notes, 
+    #                                        theme = darkly(),
+    #                                        columns = list(
+    #                                `Date of Entry` = colDef(width = 150),
+    #                                 Notes = colDef(width = 950)
+    #                              ), outlined = TRUE)
+    #               )
+    #             }
+    #             
+    #   ))
+    
     output$postcon_table <- renderReactable(
-      reactable(rv$pc_status() %>% select(-postcon_status_uid), 
-                theme = darkly(),
-                fullWidth = TRUE,
-                selection = "single",
-                searchable = TRUE,
-                onClick = "select",
-                selectionId = "status_selected",
-                #searchable = TRUE,
-                showPageSizeOptions = TRUE,
-                pageSizeOptions = c(25, 50, 100),
-                defaultPageSize = 25,
-                height = 1000, 
-                details = function(index) {
-                  nested_notes <- rv$postcon_notes()[rv$postcon_notes()$postcon_status_uid == rv$pc_status()$postcon_status_uid[index], ] %>%
-                    arrange(desc(note_date)) %>%
-                    select(`Date of Entry`= note_date, Notes = notes)
-                  htmltools::div(style = "padding: 1rem",
-                                 reactable(nested_notes, 
-                                           theme = darkly(),
-                                           columns = list(
-                                   `Date of Entry` = colDef(width = 150),
-                                    Notes = colDef(width = 950)
-                                 ), outlined = TRUE)
-                  )
-                }
-                
-      ))
+      reactable(
+        rv$pc_status() %>% select(-postcon_status_uid),
+        theme = darkly(),
+        fullWidth = TRUE,
+        selection = "single",
+        searchable = TRUE,
+        onClick = "select",
+        selectionId = "status_selected",
+        showPageSizeOptions = TRUE,
+        pageSizeOptions = c(25, 50, 100),
+        defaultPageSize = 25,
+        height = 1000,
+        columns = list(
+          `Review Status` = colDef(
+            style = function(value) {
+              if (is.na(value)) {
+                # Handling NA values; do nothing!
+              } else if (value == "Complete") {
+                return(list(background = "green", color = "white", fontweight = "bold"))
+              } else if (value == "Needs Secondary Review") {
+                return(list(background = "yellow", color = "black", fontweight = "bold"))
+              } else if (value == "Incomplete") {
+                return(list(background = "red", color = "white", fontweight = "bold"))
+              } else {
+                # Handle any unexpected values gracefully (default to white)
+              }
+            }
+          )
+        ),
+        details = function(index) {
+          nested_notes <- rv$postcon_notes()[rv$postcon_notes()$postcon_status_uid == rv$pc_status()$postcon_status_uid[index], ] %>%
+            arrange(desc(note_date)) %>%
+            select(`Date of Entry` = note_date, Notes = notes)
+          htmltools::div(
+            style = "padding: 1rem",
+            reactable(
+              nested_notes,
+              theme = darkly(),
+              columns = list(
+                `Date of Entry` = colDef(width = 150),
+                Notes = colDef(width = 950)
+              ),
+              outlined = TRUE
+            )
+          )
+        }
+      )
+    )
+    
+    
+    
+    
     
     #download buttons
     # all notes and status transactions
@@ -412,6 +526,8 @@
     selected_date <- reactiveVal(NULL)
     selected_note <- reactiveVal(NULL)
     selected_q <- reactiveVal(NULL)
+    selected_user <- reactiveVal(NULL)
+    selected_review_status <- reactiveVal(NULL)
   
     observeEvent(input$status_selected, {
       if (!is.null(input$status_selected)) {
@@ -454,7 +570,9 @@
       
       rv$postcon_status_current() %>%
         inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
-        select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, postcon_status_uid) %>%
+        left_join(rv$last_user(), by = "postcon_status_uid" ) %>%
+        left_join(rv$review_status(), by = "postcon_status_uid") %>%
+        select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, `Last Modified/Reviewed` = postcon_users, `Review Status` = review_status, postcon_status_uid) %>%
         filter(`System ID` == input$system_id)
       
     )
@@ -464,7 +582,9 @@
       
       rv$postcon_status() %>%
         inner_join(rv$postcon_status_lookup(), by = "postcon_status_lookup_uid") %>%
-        select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, postcon_status_uid) %>%
+        left_join(rv$last_user(), by = "postcon_status_uid" ) %>%
+        left_join(rv$review_status(), by = "postcon_status_uid") %>%
+        select(`System ID` = system_id, `Post Construction Status` = status, `Date of Entry` = status_date, Quarter = fq, `Last Modified/Reviewed` = postcon_users, `Review Status` = review_status, postcon_status_uid) %>%
         filter(postcon_status_uid %!in% rv$postcon_status_current()$postcon_status_uid) %>%
         filter(`System ID` == input$system_id) %>%
         arrange(desc(`Date of Entry`))
@@ -486,6 +606,23 @@
                 pageSizeOptions = c(25, 50, 100),
                 defaultPageSize = 25,
                 height = 400, 
+                columns = list(
+                  `Review Status` = colDef(
+                    style = function(value) {
+                      if (is.na(value)) {
+                        # Handling NA values; do nothing!
+                      } else if (value == "Complete") {
+                        return(list(background = "green", color = "white", fontweight = "bold"))
+                      } else if (value == "Needs Secondary Review") {
+                        return(list(background = "yellow", color = "black", fontweight = "bold"))
+                      } else if (value == "Incomplete") {
+                        return(list(background = "red", color = "white", fontweight = "bold"))
+                      } else {
+                        # Handle any unexpected values gracefully (default to white)
+                      }
+                    }
+                  )
+                ),
                 details = function(index) {
                   nested_notes <- rv$postcon_notes()[rv$postcon_notes()$postcon_status_uid == rv$Current_sys_status()$postcon_status_uid[index], ] %>%
                     arrange(desc(note_date)) %>%
@@ -518,6 +655,23 @@
                 pageSizeOptions = c(25, 50, 100),
                 defaultPageSize = 25,
                 height = 400, 
+                columns = list(
+                  `Review Status` = colDef(
+                    style = function(value) {
+                      if (is.na(value)) {
+                        # Handling NA values; do nothing!
+                      } else if (value == "Complete") {
+                        return(list(background = "green", color = "white", fontweight = "bold"))
+                      } else if (value == "Needs Secondary Review") {
+                        return(list(background = "yellow", color = "black", fontweight = "bold"))
+                      } else if (value == "Incomplete") {
+                        return(list(background = "red", color = "white", fontweight = "bold"))
+                      } else {
+                        # Handle any unexpected values gracefully (default to white)
+                      }
+                    }
+                  )
+                ),
                 details = function(index) {
                   nested_notes <- rv$postcon_notes()[rv$postcon_notes()$postcon_status_uid == rv$all_sys_status()$postcon_status_uid[index], ] %>%
                     arrange(desc(note_date)) %>%
@@ -558,6 +712,8 @@
     # system_id, data, and post_con status field can't remain blank
     observe(toggleState(id = "save_edit", (input$system_id != "" 
                                            & input$quarter_assigned != ""
+                                           & input$edit_user != ""
+                                           & input$edit_review_status != ""
                                            & (input$status_edit != "" |(input$create_status == TRUE & input$new_status !="" )))))
     
     
@@ -585,10 +741,18 @@
                       pull) 
       # selected quarter
       selected_q(rv$Current_sys_status()$`Quarter`[input$current_status_selected])
+      # selected user 
+      selected_user(rv$Current_sys_status()$`Last Modified/Reviewed`[input$current_status_selected])
+      # selected review status
+      selected_review_status(rv$Current_sys_status()$`Review Status`[input$current_status_selected])
+      
       
       updateSelectInput(session, "status_edit", selected = selected_status())
       updateTextAreaInput(session, "note", value = selected_note())
       updateSelectInput(session, "quarter_assigned", selected = selected_q())
+      updateSelectInput(session, "edit_user", selected = selected_user())
+      updateSelectInput(session, "edit_review_status", selected = selected_review_status())
+    
       reset("create_status")
       reset("new_status")      
 
@@ -630,10 +794,17 @@
       # selected quarter
       selected_q(rv$all_sys_status()$`Quarter`[input$past_status_selected])
       
+      # selected user 
+      selected_user(rv$all_sys_status()$`Last Modified/Reviewed`[input$past_status_selected])
+      # selected review status
+      selected_review_status(rv$all_sys_status()$`Review Status`[input$past_status_selected])
+      
       # updateSelectInput(session, "system_id", selected = selected_system_id())
       updateSelectInput(session, "status_edit", selected = selected_status())
       updateTextAreaInput(session, "note", value = selected_note())
       updateSelectInput(session, "quarter_assigned", selected = selected_q())
+      updateSelectInput(session, "edit_user", selected = selected_user())
+      updateSelectInput(session, "edit_review_status", selected = selected_review_status())
       reset("create_status")
       reset("new_status")      
       
@@ -660,6 +831,8 @@
       reset("create_status")
       reset("new_status")
       reset("quarter_assigned")
+      reset("edit_review_status")
+      reset("edit_user")
       
       removeModal()
     })
@@ -721,13 +894,32 @@
                                  notes =   rv$input_note(),
                                  postcon_status_uid = pc_uid))
           
+          # get user id
+          rv$user_uid <- reactive(
+            filter(users_lookup, postcon_users == input$edit_user) %>%
+              select(postcon_users_uid) %>% 
+              pull
+          )
+          
+          # get review status uid 
+          rv$review_status_uid <- reactive(
+            filter(review_status_lookup, review_status == input$edit_review_status) %>%
+              select(review_status_uid) %>% 
+              pull
+          )
           
           #odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_status"), rv$new_status(), append= TRUE, row.names = FALSE )
           #rv$new_status_q <- reactive(paste0("INSERT INTO fieldwork.tbl_postcon_status (system_id, postcon_status_lookup_uid, status_date, fiscal_quarter_lookup_uid) VALUES ('", input$system_id, "',", pc_status_uid,",'",Sys.Date(), "',", rv$fiscal_quarter_uid(),")")) 
           
           rv$new_status_q <- reactive(paste0("INSERT INTO fieldwork.tbl_postcon_status (system_id, postcon_status_lookup_uid, status_date, postcon_status_uid, fiscal_quarter_lookup_uid) VALUES ('", input$system_id, "',", pc_status_uid,",'",Sys.Date(), "',", pc_uid, ",", rv$fiscal_quarter_uid(),")")) 
           odbc::dbGetQuery(poolConn, rv$new_status_q())
-   
+          
+          rv$new_transaction_user <- reactive(paste0("INSERT INTO fieldwork.tbl_postcon_status_users (postcon_status_uid, postcon_users_uid) VALUES (", pc_uid,",", rv$user_uid(),")"))
+          odbc::dbGetQuery(poolConn, rv$new_transaction_user())
+          
+          rv$new_transaction_reviewer <- reactive(paste0("INSERT into fieldwork.tbl_postcon_review_status (postcon_status_uid, review_status_uid) VALUES (", pc_uid, ",", rv$review_status_uid(),")"))
+          odbc::dbGetQuery(poolConn, rv$new_transaction_reviewer())
+          
           
           if( rv$input_note() !=""){
           #odbc::dbWriteTable(poolConn, SQL("fieldwork.tbl_postcon_notes"), rv$new_note(), append= TRUE, row.names = FALSE )
@@ -744,7 +936,13 @@
           rv$postcon_status <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status") %>%
                                           inner_join(fq_lookup, by = "fiscal_quarter_lookup_uid") %>%
                                           select(system_id, postcon_status_lookup_uid, status_date, postcon_status_uid, fiscal_quarter_lookup_uid,  fq = fiscal_quarter))
+          # users 
+          rv$last_user <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_users") %>%
+                                     inner_join(users_lookup, by = "postcon_users_uid"))
           
+          # review status
+          rv$review_status <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_review_status") %>%
+                                         inner_join(review_status_lookup, by = "review_status_uid"))
           
           
           
@@ -760,6 +958,11 @@
           reset("sys_past_pc_table")
           reset("create_status")
           reset("new_status")
+          reset("edit_review_status")
+          reset("edit_user")
+          reset("postcon_table")
+          
+          
           
           # update drop down choices 
           status_choice <- dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup") %>%
@@ -815,6 +1018,30 @@
           
           odbc::dbGetQuery(poolConn, edit_status_current)
           
+          
+          # get user id
+          rv$user_uid <- reactive(
+            filter(users_lookup, postcon_users == input$edit_user) %>%
+              select(postcon_users_uid) %>% 
+              pull
+          )
+          
+          # get review status uid 
+          rv$review_status_uid <- reactive(
+            filter(review_status_lookup, review_status == input$edit_review_status) %>%
+              select(review_status_uid) %>% 
+              pull
+          )
+          
+          # edit user
+          rv$edit_user_q <- reactive(paste0("Update fieldwork.tbl_postcon_status_users SET postcon_users_uid = ", rv$user_uid(), "where postcon_status_uid = ", pc_uid_current))
+          odbc::dbGetQuery(poolConn, rv$edit_user_q())
+          
+          # edit review status
+          rv$edit_review_status_q <- reactive(paste0("Update fieldwork.tbl_postcon_review_status SET review_status_uid = ", rv$review_status_uid(), "where postcon_status_uid = ", pc_uid_current))
+          odbc::dbGetQuery(poolConn, rv$edit_review_status_q())
+          
+          
           if(!is.na(pc_notes_uid_current)){
             
           if( rv$input_note() !=""){
@@ -843,6 +1070,13 @@
                                           inner_join(fq_lookup, by = "fiscal_quarter_lookup_uid") %>%
                                           select(system_id, postcon_status_lookup_uid, status_date, postcon_status_uid, fiscal_quarter_lookup_uid,  fq = fiscal_quarter))
           
+          # users 
+          rv$last_user <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_users") %>%
+                                     inner_join(users_lookup, by = "postcon_users_uid"))
+          
+          # review status
+          rv$review_status <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_review_status") %>%
+                                         inner_join(review_status_lookup, by = "review_status_uid"))
           
           #post-con status types
           rv$postcon_status_lookup <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup"))
@@ -857,8 +1091,9 @@
           reset("sys_past_pc_table")
           reset("create_status")
           reset("new_status")
-          
-          
+          reset("edit_review_status")
+          reset("edit_user")
+
           # update drop down choices 
           status_choice <- dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup") %>%
             select(status) %>%
@@ -913,6 +1148,30 @@
           
           odbc::dbGetQuery(poolConn, edit_status_past)
           
+        
+          # get user id
+          rv$user_uid <- reactive(
+            filter(users_lookup, postcon_users == input$edit_user) %>%
+              select(postcon_users_uid) %>% 
+              pull
+          )
+          
+          # get review status uid 
+          rv$review_status_uid <- reactive(
+            filter(review_status_lookup, review_status == input$edit_review_status) %>%
+              select(review_status_uid) %>% 
+              pull
+          )
+          
+          # edit user
+          rv$edit_user_q <- reactive(paste0("Update fieldwork.tbl_postcon_status_users SET postcon_users_uid = ", rv$user_uid(), "where postcon_status_uid = ", pc_uid_past))
+          odbc::dbGetQuery(poolConn, rv$edit_user_q())
+          
+          # edit review status
+          rv$edit_review_status_q <- reactive(paste0("Update fieldwork.tbl_postcon_review_status SET review_status_uid = ", rv$review_status_uid(), "where postcon_status_uid = ", pc_uid_past))
+          odbc::dbGetQuery(poolConn, rv$edit_review_status_q())
+          
+          
           if(!is.na(pc_notes_uid_past)){
           if( rv$input_note() !=""){
             odbc::dbGetQuery(poolConn, edit_note_past)
@@ -942,6 +1201,13 @@
                                           inner_join(fq_lookup, by = "fiscal_quarter_lookup_uid") %>%
                                           select(system_id, postcon_status_lookup_uid, status_date, postcon_status_uid, fiscal_quarter_lookup_uid,  fq = fiscal_quarter))
           
+          # users 
+          rv$last_user <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_users") %>%
+                                     inner_join(users_lookup, by = "postcon_users_uid"))
+          
+          # review status
+          rv$review_status <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_review_status") %>%
+                                         inner_join(review_status_lookup, by = "review_status_uid"))
           
           #post-con status types
           rv$postcon_status_lookup <- reactive(dbGetQuery(poolConn, "select * from fieldwork.tbl_postcon_status_lookup"))
@@ -956,6 +1222,8 @@
           reset("sys_past_pc_table")
           reset("create_status")
           reset("new_status")
+          reset("edit_review_status")
+          reset("edit_user")
           
           
           # update drop down choices 
