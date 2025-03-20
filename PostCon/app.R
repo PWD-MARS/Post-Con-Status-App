@@ -112,7 +112,7 @@
   }
   
   # Define UI
-  ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status", id = "TabPanelID", theme = shinytheme("cyborg"),
+  ui <- tagList(useShinyjs(), navbarPage("Post-Construction Status App", id = "TabPanelID", theme = shinytheme("cyborg"),
                    tabPanel("Post-Construction Status Table", value = "status", 
                             sidebarLayout(
                               
