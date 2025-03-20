@@ -27,6 +27,10 @@
   #excel download
   library(xlsx)
   library(DBI)
+  #Rpostgres for dbcon
+  library(RPostgres)
+  #Package Versioning
+  library(renv)
 #Not in logical
   `%!in%` <- Negate(`%in%`)
 
@@ -38,7 +42,13 @@
 #set db connection
 #using a pool connection so separate connnections are unified
 #gets environmental variables saved in local or pwdrstudio environment
-  poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+  #poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+  poolConn <- dbPool(RPostgres::Postgres(),
+                 dbname = 'mars_data', 
+                 host = 'PWDMARSDBS1', 
+                 port = 5434, 
+                 user = Sys.getenv("shiny_uid"),
+                 password = Sys.getenv("shiny_pwd"))
 
 #disconnect from db on stop 
   onStop(function(){

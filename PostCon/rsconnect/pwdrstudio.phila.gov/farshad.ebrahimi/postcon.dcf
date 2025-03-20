@@ -1,0 +1,12 @@
+name: postcon
+title: PostCon
+username: farshad.ebrahimi
+account: farshad.ebrahimi
+server: pwdrstudio.phila.gov
+hostUrl: https://pwdrstudio.phila.gov/__api__
+appId: 400
+bundleId: 2973
+url: https://pwdrstudio.phila.gov/mars/postcon/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
