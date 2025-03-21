@@ -31,6 +31,8 @@
   library(RPostgres)
   #Package Versioning
   library(renv)
+  #css
+  library(shinycssloaders)
 #Not in logical
   `%!in%` <- Negate(`%in%`)
 
@@ -156,7 +158,7 @@
           
                               mainPanel(
                                 strong(span(textOutput("table_name"), style = "font-size:22px")),
-                                reactableOutput("postcon_table")
+                                reactableOutput("postcon_table") %>% withSpinner(color="#0dc5c1")
                               )
                             )
                             ),
