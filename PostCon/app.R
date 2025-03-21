@@ -857,7 +857,7 @@
     
     
     #add/edit button toggle
-    rv$label <- reactive(if(length(input$current_status_selected) == 0 & length(input$past_status_selected) == 0) "Save The Post-Con Status/Notes" else "Edit Selected")
+    rv$label <- reactive(if(length(input$current_status_selected) == 0 & length(input$past_status_selected) == 0) "Add New Post-Con Status Row" else "Edit Selected")
     observe(updateActionButton(session, "save_edit", label = rv$label()))
     
     
