@@ -174,7 +174,7 @@
                                         textAreaInput("new_status", "New Post Construction Status:", height = '50px')),
                        selectInput("quarter_assigned", "Quarter", choices = c("", q_list) , selected = ""),
                        #dateInput("date",label = "Date",value = NULL),
-                       textAreaInput("note", "Notes", height = '160px'),
+                       textAreaInput("note", "Notes", height = '200px'),
                        disabled(actionButton("save_edit", "Save Changes")),
                        actionButton("clear_pcs", "Clear All Fields")
                        
