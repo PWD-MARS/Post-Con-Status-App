@@ -46,7 +46,7 @@
 #gets environmental variables saved in local or pwdrstudio environment
   #poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
   poolConn <- dbPool(RPostgres::Postgres(),
-                 dbname = 'mars_data', 
+                 dbname = 'sandbox_dtime', 
                  host = 'PWDMARSDBS1', 
                  port = 5434, 
                  user = Sys.getenv("shiny_uid"),
@@ -1353,13 +1353,13 @@
     # 
     ### Matching SRT deployments with SRT table records to ensure they match (full join between srt and deployment table)
     rv$srt_qa <- reactive(deployment_all %>%
-                            filter(deployment_dtime_est <= rv$qa_end_date() & deployment_dtime_est > rv$qa_start_date()) %>%                   
+                            filter(deployment_dtime <= rv$qa_end_date() & deployment_dtime > rv$qa_start_date()) %>%                   
                             filter(term == "SRT") %>%
-                            full_join(rv$srt(), by = c("deployment_dtime_est" = "test_date", "system_id")) %>%
+                            full_join(rv$srt(), by = c("deployment_dtime" = "test_date", "system_id")) %>%
                             filter(is.na(srt_uid) | is.na(deployment_uid)) %>%
-                            mutate(deployment_dtime_est = deployment_dtime_est %>% lubridate::ymd()) %>%
+                            mutate(deployment_dtime = deployment_dtime %>% lubridate::ymd()) %>%
                             distinct() %>%
-                            select(`System ID` = system_id, `SMP ID` = smp_id, `Deployment ID` = deployment_uid, ` SRT ID` = srt_uid, `Deployment/SRT Date` = deployment_dtime_est))
+                            select(`System ID` = system_id, `SMP ID` = smp_id, `Deployment ID` = deployment_uid, ` SRT ID` = srt_uid, `Deployment/SRT Date` = deployment_dtime))
 
     ### left join between postcon srt table and the post-con status table to ensure all those systems with postcon SRT have post-con status
     rv$srt_nopostcon <- reactive(rv$srt_postcon() %>%
