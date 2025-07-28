@@ -102,9 +102,9 @@
 # Fiscal uarters 
   fq <- dbGetQuery(poolConn, "SELECT * FROM admin.tbl_fiscal_quarter_lookup")
 
-  
   # filter out to more recent quarters
   q_list <- fq %>%
+    arrange(fiscal_quarter_lookup_uid) %>%
     select(fiscal_quarter) %>%
     pull
   
